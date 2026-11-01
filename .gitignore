@@ -1,0 +1,14 @@
+# Scratch files: logs, screenshots, downloads
+/tmp/
+
+# Python caches (tests/)
+__pycache__/
+
+# Machine-specific
+.idea/
+.vscode/
+.DS_Store
+.claude/settings.local.json
+
+# Android command-line tools zip, if downloaded into the repo root (see docs/SETUP.md)
+/commandlinetools-*.zip

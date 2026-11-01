@@ -1,0 +1,509 @@
+#!/usr/bin/env bash
+# Boots a phone or tablet emulator and returns once Android has finished booting, so it can be
+# chained: start-emulator.sh && ./gradlew installDebug
+#
+# Usage:   start-emulator.sh [--quick] [--wait-for-home] [avd-name] [extra emulator flags...]
+#            start-emulator.sh                       # the default AVD (see below), cold boot
+#            start-emulator.sh --quick               # boot from the Quick Boot snapshot instead
+#            start-emulator.sh --wait-for-home       # return once the home app has settled in front
+#            start-emulator.sh -wipe-data            # default AVD, factory reset
+#            start-emulator.sh my_phone -gpu host    # another AVD, hardware rendering
+#          EMULATOR_TOOLBAR=show start-emulator.sh   # keep a clickable side toolbar (WSL)
+#          start-emulator.sh --help
+# Which AVD: the name given, else $AWDT_AVD, else the default AVD (DEFAULT_AVD, lib/avd.sh) if it
+#          exists, else the only phone or tablet AVD. Anything else is an error that lists the AVDs.
+# Output:  the emulator's serial (e.g. emulator-5554), alone on stdout, so scripts can capture it:
+#          serial="$(start-emulator.sh)". Every message goes to stderr.
+# Log:     ${TMPDIR:-/tmp}/emulator-<avd-name>.log  (look here first if the window never appears)
+# Stop:    stop-emulator.sh <avd-name|serial>   (returns once it has exited; the emulator saves
+#          a Quick Boot snapshot, which --quick boots from)
+#
+# Cold boot or Quick Boot: a cold boot (the default, -no-snapshot-load) starts Android from scratch
+# (slower on newer API levels). --quick restores the snapshot saved when the emulator was last
+# stopped, which is faster, but that snapshot also holds adbd's old connection, and sometimes adb
+# then lists the emulator as "offline" for good. So with --quick, an emulator that stays offline for $AWDT_OFFLINE_TIMEOUT
+# seconds (default 30) gets `adb reconnect offline`, and if it's still offline that long after,
+# the script gives up instead of waiting forever. A cold boot is offline for a while too, until
+# adbd starts, which is normal, so it's never cut short.
+#
+# Boot timeout: an emulator that keeps running without ever finishing its boot (a stuck boot, a
+# broken image or data partition) would otherwise keep this script, and a CI job that calls it,
+# waiting forever. After $AWDT_BOOT_TIMEOUT seconds (default 900; 0: no limit) the script stops the
+# emulator it started, which is of no use half-booted, and fails. Each adb call that checks the
+# boot gets its own time limit, since adb can hang on such an emulator. Meanwhile the script says
+# every minute that the emulator is still booting, so a slow boot (in a CI log, say) doesn't look
+# like a hang.
+#
+# Already running: an AVD that's running isn't started again (its files are locked), but it may
+# still be booting, e.g. started by another call or CI step a moment ago. So the script waits for
+# its boot like for its own, with the same timeout, but never stops it: it's not this script's.
+#
+# Waiting for the home app (--wait-for-home, opt-in): sys.boot_completed=1 comes before the device
+# has settled. From API 24 on, Settings' FallbackHome holds the screen until the user is unlocked,
+# and HOME resolves to it; the home app comes to the front only then, sometimes after
+# sys.boot_completed; and on a host short of CPU no window had the focus long after it, so no key
+# reached any app (an instrumented test's first key waits for a focused window, and fails). With
+# --wait-for-home the script then also waits until the home app's screen is in front, has finished
+# starting and has the focus, at two looks in a row (wait_for_home in home.sh says exactly what it
+# checks), for at most $AWDT_HOME_TIMEOUT seconds (default 600; 0: no limit), counted from when
+# Android has booted. When time's up it fails, naming what was in front, and stops the emulator if
+# it started it, as after a boot timeout. When another app's screen keeps the focus, it presses Back,
+# twice at most, never on a screen of the home
+# app's own, and only on an emulator whose boot it waited for: one that had booted before may be in
+# use, so there it only looks. The long limit is for the device on its way to its home screen;
+# another app's screen never is, so once the same one has kept the focus for $AWDT_OTHER_APP_TIMEOUT
+# seconds (default 60; 0: no such limit), after the Backs if any, it fails at once, naming it,
+# rather than wait out $AWDT_HOME_TIMEOUT. Nor can a home app come when none is enabled (a stock
+# launcher left disabled): from API 24 on, once the user is unlocked and still nothing but Settings'
+# FallbackHome handles a HOME intent, it fails at once. With --quick the restored device has usually
+# settled already.
+#
+# No display: the emulator's window needs an X display (it ships only Qt's X11 plugin). Without
+# $DISPLAY (a CI runner, an SSH session) it aborts, and its log doesn't say why, so the script
+# adds -no-window.
+#
+# Common errors:
+#   "No access to /dev/kvm"
+#       The user isn't in the kvm group: sudo usermod -aG kvm $USER. When the message says the
+#       device belongs to another group, the kvm group can't help; chgrp the device instead (the
+#       message shows how). If /dev/kvm doesn't exist at all, hardware virtualization is off
+#       (in the firmware, or nested virtualization for WSL).
+#   "the emulator exited with status N" / "the emulator exited, killed by signal N (SIG...)"
+#       It failed to start or crashed; the log's last lines are printed. A crash by a signal can
+#       leave nothing in the log, so the signal is named.
+#   "didn't finish booting within ... s"
+#       Android didn't boot in time, and the emulator was stopped. On a slow host, raise
+#       AWDT_BOOT_TIMEOUT; if it never boots, try -wipe-data (factory reset).
+#   "adb can't reach it" (--quick only)
+#       The restored snapshot left adb offline, even after a reconnect: stop the emulator and
+#       start it without --quick.
+#   "its home app wasn't in front ... within ... s" (--wait-for-home only)
+#       What was in front instead is named: something kept the focus, or nothing had it. On a
+#       slow host, raise AWDT_HOME_TIMEOUT.
+#   "no home app is enabled" (--wait-for-home only, API 24 on)
+#       Every home app is disabled, e.g. the stock launcher by `pm disable-user`: enable one.
+#
+# Everything below exists for a reason; see the comment on each step before removing one.
+set -euo pipefail
+
+usage() {
+    cat <<'EOF'
+Usage: start-emulator.sh [--quick] [--wait-for-home] [avd-name] [emulator flags...]
+
+Boots a phone or tablet emulator in the background and returns once Android is ready, so it can be
+chained: start-emulator.sh && ./gradlew installDebug. Cold boot by default.
+
+Prints the emulator's serial (e.g. emulator-5554) on stdout and every message on stderr, so
+serial="$(start-emulator.sh)" captures it. Without $DISPLAY it adds -no-window.
+
+  --quick         boot from the Quick Boot snapshot saved when the emulator was last stopped
+                  (faster); if adb can't reach the restored emulator for 30 s, reconnect adb once,
+                  then give up
+  --wait-for-home once Android has booted, also wait until the device has settled: its home
+                  app's screen in front, done starting, holding the focus, at two looks in a
+                  row; if another app's screen keeps the focus, press Back (twice at most),
+                  except on an emulator that had booted before this call. If that takes over
+                  $AWDT_HOME_TIMEOUT s, or another app's screen keeps the focus for
+                  $AWDT_OTHER_APP_TIMEOUT s, or no home app is enabled (API 24 on), fail, and
+                  stop the emulator if this script started it
+  avd-name        the AVD to boot. Default: $AWDT_AVD, else phone_api36 if it exists, else the
+                  only phone or tablet AVD
+  emulator flags  passed on to the emulator, e.g. -wipe-data, -no-window,
+                  -gpu host (replaces the default -gpu swangle_indirect)
+  -h, --help      show this help
+
+Environment:
+  AWDT_AVD           default AVD name
+  AWDT_BOOT_TIMEOUT  seconds to wait for Android to boot before stopping the emulator and
+                    failing (default: 900; 0: no limit)
+  AWDT_HOME_TIMEOUT  with --wait-for-home: seconds to wait for the home app after the boot
+                    (default: 600; 0: no limit)
+  AWDT_OTHER_APP_TIMEOUT
+                    with --wait-for-home: seconds a screen of another app may keep the
+                    focus before the wait fails (default: 60; 0: only AWDT_HOME_TIMEOUT)
+  EMULATOR_TOOLBAR  WSL only: hide (default) or show the emulator's side toolbar
+                    (see bin/README.md)
+
+If the AVD is already running, it isn't started again: the script waits until it has booted,
+then prints its serial. The emulator keeps running after this
+script exits; stop it with: stop-emulator.sh <avd-name|serial>
+EOF
+}
+case "${1:-}" in
+    -h|--help) usage; exit 0 ;;
+esac
+
+LIB_DIR="$(dirname "$(readlink -f "$0")")/../lib"
+# shellcheck source=../lib/sdk.sh
+source "$LIB_DIR/sdk.sh"
+# shellcheck source=../lib/avd.sh
+source "$LIB_DIR/avd.sh"
+# shellcheck source=../lib/device.sh
+source "$LIB_DIR/device.sh"
+# shellcheck source=../lib/home.sh
+source "$LIB_DIR/home.sh"
+require "$EMULATOR" "emulator"
+require "$ADB" "platform-tools"
+
+BOOT_TIMEOUT="${AWDT_BOOT_TIMEOUT:-900}"   # seconds, 0 = no limit (see the header)
+if ! [[ "$BOOT_TIMEOUT" =~ ^[0-9]+$ ]]; then
+    die "AWDT_BOOT_TIMEOUT must be a number of seconds (0: no limit), not '$BOOT_TIMEOUT'."
+fi
+
+# --quick and --wait-for-home are this script's own flags, allowed anywhere; the emulator's flags
+# have a single dash.
+QUICK=""
+WAIT_FOR_HOME=""
+ARGS=()
+for arg in "$@"; do
+    case "$arg" in
+        --quick) QUICK=1 ;;
+        --wait-for-home) WAIT_FOR_HOME=1 ;;
+        *) ARGS+=("$arg") ;;
+    esac
+done
+set -- ${ARGS[@]+"${ARGS[@]}"}
+
+HOME_TIMEOUT="${AWDT_HOME_TIMEOUT:-600}"   # seconds, 0 = no limit (see the header)
+if [ -n "$WAIT_FOR_HOME" ] && ! [[ "$HOME_TIMEOUT" =~ ^[0-9]+$ ]]; then
+    die "AWDT_HOME_TIMEOUT must be a number of seconds (0: no limit), not '$HOME_TIMEOUT'."
+fi
+# home.sh's OTHER_APP_TIMEOUT, for wait_for_home (see the header): validated here, where it's used.
+if [ -n "$WAIT_FOR_HOME" ] && ! [[ "$OTHER_APP_TIMEOUT" =~ ^[0-9]+$ ]]; then
+    die "AWDT_OTHER_APP_TIMEOUT must be a number of seconds (0: no such limit), not '$OTHER_APP_TIMEOUT'."
+fi
+
+# The first argument is the AVD name, unless it's already an emulator flag (e.g. just -wipe-data).
+AVD_NAME=""
+if [ $# -gt 0 ] && [[ "$1" != -* ]]; then
+    AVD_NAME="$1"
+    shift
+fi
+
+in_list() {                               # in_list <word> <list...>
+    local word="$1" item
+    shift
+    for item in "$@"; do
+        if [ "$item" = "$word" ]; then return 0; fi
+    done
+    return 1
+}
+# Whether an AVD is of a phone or tablet: the AVD folder is shared with every other kind of emulator
+# (a TV's, a watch's), which these scripts aren't for.
+is_handheld_avd() {
+    local dir
+    dir="$(avd_dir "$1")" && grep -Eq '^tag\.ids? *=.*(default|google_apis)' "$dir/config.ini" &&
+        ! grep -Eq '^tag\.ids? *=.*(android-tv|google-tv|wear|automotive|desktop|xr)' "$dir/config.ini"
+}
+
+# Pick the AVD. $DEFAULT_AVD is what create-avd.sh makes; a collaborator's own phone AVD is used when
+# it's the only one, so nobody has to rename theirs.
+mapfile -t AVDS < <(list_avds)
+[ -n "$AVD_NAME" ] || AVD_NAME="${AWDT_AVD:-}"
+if [ -z "$AVD_NAME" ]; then
+    if in_list "$DEFAULT_AVD" "${AVDS[@]}"; then
+        AVD_NAME="$DEFAULT_AVD"
+    else
+        HANDHELD_AVDS=()
+        for avd in "${AVDS[@]}"; do
+            if is_handheld_avd "$avd"; then HANDHELD_AVDS+=("$avd"); fi
+        done
+        if [ ${#HANDHELD_AVDS[@]} -eq 1 ]; then AVD_NAME="${HANDHELD_AVDS[0]}"; fi
+    fi
+fi
+if [ -z "$AVD_NAME" ] || ! in_list "$AVD_NAME" "${AVDS[@]}"; then
+    if [ -n "$AVD_NAME" ]; then problem="there's no AVD named '$AVD_NAME'."
+    else problem="can't tell which AVD to use: no $DEFAULT_AVD and not exactly one phone or tablet AVD."; fi
+    die "$problem
+AVDs found: ${AVDS[*]:-none}
+Pass a name ($(command_for start-emulator.sh) <avd-name>), set AWDT_AVD, or create one with
+$(command_for create-avd.sh)."
+fi
+
+# KVM is mandatory for x86 images (without it the emulator exits with "x86 emulation currently
+# requires hardware acceleration"). Three things can be wrong, and they need different fixes, so
+# they're told apart here rather than reported as one "no access":
+#   1. the device is missing entirely -> virtualization is off;
+#   2. it belongs to a group that isn't the kvm group -> joining kvm can never help (seen on WSL,
+#      where /dev/kvm is created before udev applies 50-udev-default.rules);
+#   3. the user is in the kvm group but this session predates it -> re-run through 'sg kvm', which
+#      grants the group right away, instead of making the user restart the session.
+# _IN_SG_KVM prevents an endless re-exec loop if the device is still not writable inside sg. The
+# membership check matters: 'sg' asks for a group password when the user isn't a member. It asks
+# the user database (id -nG <user>), not this session, so a group joined since login counts, and
+# so does kvm as the user's primary group; $USER isn't used, as containers often don't set it.
+if [ ! -e "$KVM_DEVICE" ]; then
+    die "$KVM_DEVICE doesn't exist: enable hardware virtualization (VT-x/AMD-V in the firmware
+settings; nested virtualization when running inside WSL or a VM)."
+fi
+if [ ! -w "$KVM_DEVICE" ]; then
+    KVM_GROUP_LINE="$(getent group kvm || true)"
+    DEVICE_GID="$(stat -c %g "$KVM_DEVICE")"
+    KVM_GID="$(printf '%s' "$KVM_GROUP_LINE" | awk -F: '{print $3}')"
+    if [ -n "$KVM_GID" ] && [ "$DEVICE_GID" != "$KVM_GID" ]; then
+        die "No access to $KVM_DEVICE: it belongs to group $DEVICE_GID, but the kvm group is
+$KVM_GID, so joining the kvm group can't grant access. Give the device to the kvm group:
+    sudo chgrp kvm $KVM_DEVICE && sudo chmod 660 $KVM_DEVICE
+and to keep that across restarts:
+    echo 'z $KVM_DEVICE 0660 root kvm -' | sudo tee /etc/tmpfiles.d/kvm.conf"
+    fi
+    ME="$(id -un)"
+    if [[ " $(id -nG "$ME" 2>/dev/null || true) " == *" kvm "* ]] && [ -z "${_IN_SG_KVM:-}" ]; then
+        exec sg kvm -c "_IN_SG_KVM=1 $(printf '%q ' "$BIN_DIR/start-emulator.sh" "$AVD_NAME" \
+            ${QUICK:+--quick} ${WAIT_FOR_HOME:+--wait-for-home} "$@")"
+    fi
+    die "No access to $KVM_DEVICE. Run: sudo usermod -aG kvm $ME"
+fi
+
+# The serial of the running emulator of this AVD, if any. Emulators are matched by AVD name, never
+# by "the only device": other emulators and phones may be connected. The emulator picks the first
+# free port, so each running emulator is asked for its AVD name.
+avd_serial() {
+    local serial
+    for serial in $(running_emulators); do
+        if [ "$(emulator_avd "$serial")" = "$AVD_NAME" ]; then echo "$serial"; return 0; fi
+    done
+    return 1
+}
+
+# Starting an AVD twice fails (its files are locked), so an already running one is only waited
+# for (see the header). STARTED_HERE tells the two apart below: only an emulator started here is
+# watched through its process, stopped on a timeout, and gets the WSLg toolbar fix.
+SERIAL="$(avd_serial || true)"
+STARTED_HERE=""
+LOG="${TMPDIR:-/tmp}/emulator-$AVD_NAME.log"
+if [ -n "$SERIAL" ]; then
+    echo "Emulator '$AVD_NAME' is already running as $SERIAL." >&2
+fi
+
+# No X display, no window (see the header).
+if [ -z "$SERIAL" ] && [ -z "${DISPLAY:-}" ] && ! in_list -no-window "$@"; then
+    echo "No \$DISPLAY, so the emulator runs without a window (-no-window)." >&2
+    set -- "$@" -no-window
+fi
+
+# -gpu: the renderer (GPU_MODE, sdk.sh). Left out when the caller passes their own.
+# -no-audio: sound is rarely needed; one less host integration (PulseAudio) to go wrong.
+# -no-boot-anim: faster cold boots.
+# -no-snapshot-load: cold boot, unless --quick (see the header). The emulator still saves a
+#   snapshot when it's stopped, for a later --quick.
+# nohup + & keeps the emulator running after this script (and the terminal) exits.
+if [ -z "$SERIAL" ]; then
+    GPU=(-gpu "$GPU_MODE")
+    if in_list -gpu "$@"; then GPU=(); fi
+    BOOT=(-no-snapshot-load)
+    BOOT_KIND="cold boot"
+    if [ -n "$QUICK" ]; then BOOT=(); BOOT_KIND="Quick Boot"; fi
+    if in_list -no-snapshot-load "$@"; then BOOT=(); fi
+    nohup "$EMULATOR" -avd "$AVD_NAME" \
+        "${GPU[@]}" \
+        ${BOOT[@]+"${BOOT[@]}"} \
+        -no-boot-anim \
+        -no-audio \
+        "$@" > "$LOG" 2>&1 &
+    EMULATOR_PID=$!
+    STARTED_HERE=1
+    echo "Emulator '$AVD_NAME' starting ($BOOT_KIND, log: $LOG)..." >&2
+fi
+BOOT_STARTED=$SECONDS
+
+# How the emulator started above ended, from its exit status. A crash can leave nothing in its
+# log (a segfault: SwiftShader's, where SELinux denies it executable heap), so its signal is all
+# that tells it from a normal start. Sets EXIT_REASON rather than printing it: wait only works
+# in the shell that started the emulator, not in a $(...) subshell.
+emulator_exit_reason() {
+    local status=0
+    wait "$EMULATOR_PID" 2>/dev/null || status=$?
+    if [ "$status" -gt 128 ]; then
+        EXIT_REASON="the emulator exited, killed by signal $((status - 128)) (SIG$(kill -l "$status"))"
+    else
+        EXIT_REASON="the emulator exited with status $status"
+    fi
+}
+
+# Without this, a crashed or stopped emulator would leave the loops below waiting forever. One
+# started elsewhere has no process here to watch, so adb has to still list it.
+check_alive() {
+    if [ -n "$STARTED_HERE" ]; then
+        if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+            emulator_exit_reason
+            die "$EXIT_REASON. Last lines of $LOG:
+$(tail -n 15 "$LOG")"
+        fi
+    # grep without -q reads all its input: exiting early could fail the pipeline (pipefail).
+    elif ! running_emulators | grep -xF -- "$SERIAL" > /dev/null; then
+        die "'$AVD_NAME' ($SERIAL) was stopped before it finished booting."
+    fi
+}
+
+# Stops the emulator started above and waits until it's gone, so that a retry doesn't find it
+# still running and report it as ready. SIGTERM lets it shut down cleanly; SIGKILL only if it
+# doesn't within 30 s, which the emulator tier copies (tests/emulator/test_on_emulator.py).
+stop_emulator() {
+    local waited=0
+    kill "$EMULATOR_PID" 2>/dev/null || return 0
+    while kill -0 "$EMULATOR_PID" 2>/dev/null && [ "$waited" -lt 30 ]; do
+        sleep 1
+        waited=$((waited + 1))
+    done
+    kill -9 "$EMULATOR_PID" 2>/dev/null || true
+}
+
+# An emulator that runs but never boots would otherwise keep the loops below waiting forever
+# (see the header). The log is read before stopping it, whose shutdown lines would hide the cause.
+check_timeout() {
+    local last_lines
+    [ "$BOOT_TIMEOUT" -gt 0 ] && time_is_up "$BOOT_STARTED" "$BOOT_TIMEOUT" || return 0
+    if [ -z "$STARTED_HERE" ]; then
+        die "'$AVD_NAME' ($SERIAL) didn't finish booting within $BOOT_TIMEOUT s.
+It wasn't started by this script, so it's left running. Stop it with:
+  $(command_for stop-emulator.sh) $SERIAL
+On a slow host, set AWDT_BOOT_TIMEOUT to wait longer (0: no limit)."
+    fi
+    last_lines="$(tail -n 15 "$LOG")"
+    stop_emulator
+    die "'$AVD_NAME' didn't finish booting within $BOOT_TIMEOUT s, so it was stopped. Last lines
+of $LOG:
+$last_lines
+On a slow host, set AWDT_BOOT_TIMEOUT to wait longer (0: no limit). If it never boots, try a
+factory reset: $(command_for start-emulator.sh) $AVD_NAME -wipe-data"
+}
+
+# A boot can take minutes with nothing to show, which in a CI log looks like a hang (see the
+# header). AWDT_PROGRESS_INTERVAL exists for the tests.
+PROGRESS_INTERVAL="${AWDT_PROGRESS_INTERVAL:-60}"
+last_progress=$BOOT_STARTED
+report_progress() {
+    local limit=""
+    time_is_up "$last_progress" "$PROGRESS_INTERVAL" || return 0
+    if [ "$BOOT_TIMEOUT" -gt 0 ]; then limit="; the limit is $BOOT_TIMEOUT s"; fi
+    echo "'$AVD_NAME' is still booting ($((SECONDS - BOOT_STARTED)) s so far$limit)..." >&2
+    last_progress=$SECONDS
+}
+
+# Find the serial of the emulator started above (emulator-<port>), once it shows up in adb.
+while [ -z "$SERIAL" ]; do
+    check_alive
+    check_timeout
+    report_progress
+    SERIAL="$(avd_serial || true)"
+    if [ -z "$SERIAL" ]; then sleep 1; fi
+done
+
+# With --quick, an emulator adb keeps listing as offline gets one `adb reconnect offline` after
+# OFFLINE_TIMEOUT seconds, and after as long again the script gives up (see the header).
+# The reconnect only touches offline devices, which adb can't use anyway.
+OFFLINE_TIMEOUT="${AWDT_OFFLINE_TIMEOUT:-30}"
+offline_since=""
+reconnected=""
+check_offline() {
+    [ -n "$QUICK" ] && [ -n "$STARTED_HERE" ] || return 0
+    if [ "$(adb_bounded devices 2>/dev/null | awk -v s="$SERIAL" '$1 == s { print $2 }')" != offline ]; then
+        offline_since=""
+        return 0
+    fi
+    [ -n "$offline_since" ] || offline_since=$SECONDS
+    time_is_up "$offline_since" "$OFFLINE_TIMEOUT" || return 0
+    if [ -z "$reconnected" ]; then
+        echo "adb has seen $SERIAL as offline for ${OFFLINE_TIMEOUT} s; reconnecting adb..." >&2
+        adb_bounded reconnect offline > /dev/null 2>&1 || true
+        reconnected=1
+        offline_since=""
+        return 0
+    fi
+    die "'$AVD_NAME' ($SERIAL) was restored from its Quick Boot snapshot, but adb can't reach it
+(still offline after adb reconnect). Stop it and start it without --quick, for a cold boot:
+  $(command_for stop-emulator.sh) $SERIAL && $(command_for start-emulator.sh) $AVD_NAME"
+}
+
+# adbd answers long before the package manager is up, and installing at that point fails, so wait
+# for sys.boot_completed. tr strips the '\r' that adb shell appends; </dev/null keeps adb shell
+# from using up the stdin of whatever called this script. adb_bounded (device.sh): a hung call
+# counts as "not booted yet", so the boot timeout still applies.
+until [ "$(adb_bounded -s "$SERIAL" shell getprop sys.boot_completed < /dev/null 2>/dev/null \
+        | tr -d '\r')" = "1" ]; do
+    check_alive
+    check_timeout
+    check_offline
+    report_progress
+    sleep 2
+    WAITED=1
+done
+if [ -n "$STARTED_HERE" ] || [ -n "${WAITED:-}" ]; then
+    echo "Emulator '$AVD_NAME' booted as $SERIAL." >&2
+fi
+# The boot comes before the device has settled; with --wait-for-home, wait for that too (see the
+# header). Back, for a screen that keeps the focus, only on an emulator whose boot the script saw:
+# one that had booted before may be in use. A failure is handled like a boot timeout: an emulator
+# started here is of no use unsettled.
+if [ -n "$WAIT_FOR_HOME" ]; then
+    limit=""
+    if [ "$HOME_TIMEOUT" -gt 0 ]; then limit=" (up to $HOME_TIMEOUT s)"; fi
+    echo "Waiting for the home app to be in front, with the focus$limit..." >&2
+    BACKS=0
+    if [ -n "$STARTED_HERE" ] || [ -n "${WAITED:-}" ]; then BACKS=2; fi
+    HOME_STATUS=0
+    FRONT="$(wait_for_home "$SERIAL" "$HOME_TIMEOUT" "$BACKS")" || HOME_STATUS=$?
+    if [ "$HOME_STATUS" -eq 0 ]; then
+        echo "The home app ($FRONT) is in front." >&2
+    else
+        # 2: another app's screen kept the focus for OTHER_APP_TIMEOUT s; 3: no home app is
+        # enabled (wait_for_home, home.sh).
+        if [ "$HOME_STATUS" -eq 2 ]; then
+            why="a screen of another app than its home app has kept the focus for $OTHER_APP_TIMEOUT s"
+            why+="$(if [ "$BACKS" -gt 0 ]; then echo ", also after Back"; fi), so the home app can't come to"
+            why+=" the front"
+        elif [ "$HOME_STATUS" -eq 3 ]; then
+            why="no home app is enabled (a disabled stock launcher?): the user is unlocked, and nothing"
+            why+=" but Settings' FallbackHome handles a HOME intent"
+        else
+            why="its home app wasn't in front with the focus within $HOME_TIMEOUT s"
+        fi
+        if [ -z "$STARTED_HERE" ]; then
+            if [ "$HOME_STATUS" -eq 2 ]; then
+                hint="Nothing was pressed on it: close that screen on the device (Back, or Home:
+adb -s $SERIAL shell input keyevent HOME), then try again."
+            elif [ "$HOME_STATUS" -eq 3 ]; then
+                hint="Enable its home app, e.g. its stock launcher, then try again
+(adb -s $SERIAL shell pm list packages -d lists the disabled apps; adb -s $SERIAL shell pm enable <package>)."
+            else
+                hint="On a slow host, set AWDT_HOME_TIMEOUT to wait longer (0: no limit)."
+            fi
+            die "'$AVD_NAME' ($SERIAL) booted, but $why.
+In front: $FRONT.
+It wasn't started by this script, so it's left running.
+$hint"
+        fi
+        if [ "$HOME_STATUS" -eq 2 ]; then
+            hint="To see that screen, boot it without --wait-for-home."
+        elif [ "$HOME_STATUS" -eq 3 ]; then
+            hint="Boot it without --wait-for-home and enable its home app, e.g. its stock launcher
+(adb shell pm list packages -d lists the disabled apps; adb shell pm enable <package>)."
+        else
+            hint="On a slow host, set AWDT_HOME_TIMEOUT to wait longer (0: no limit)."
+        fi
+        stop_emulator
+        die "'$AVD_NAME' booted, but $why,
+so it was stopped. In front: $FRONT.
+$hint"
+    fi
+fi
+
+# With several devices connected, adb refuses to guess and `./gradlew installDebug` installs on
+# all of them. Both honor ANDROID_SERIAL.
+if [ -n "$STARTED_HERE" ] && [ "$(adb_bounded devices | awk 'NR > 1 && NF' | wc -l)" -gt 1 ]; then
+    echo "Other devices are connected too. To make adb and Gradle use only this one:" >&2
+    echo "  export ANDROID_SERIAL=$SERIAL" >&2
+fi
+
+# Under WSLg the side toolbar can't be clicked, and while it's shown it takes keyboard focus away
+# from the emulator screen (typed keys never reach Android). So it's hidden by default: see
+# wslg-toolbar.py. Skipped outside
+# WSL (not needed) and with -no-window (there's no toolbar). '|| true': a failure here must not
+# report the already-booted emulator as failed.
+if [ -n "$STARTED_HERE" ] && is_wsl && ! in_list -no-window "$@"; then
+    python3 "$BIN_DIR/wslg-toolbar.py" "$AVD_NAME" "${EMULATOR_TOOLBAR:-hide}" >&2 || true
+fi
+
+# The only line on stdout (see the header).
+echo "$SERIAL"
