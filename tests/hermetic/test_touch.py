@@ -1,4 +1,4 @@
-"""touch.sh: what each gesture passes to the program on the device, percentages, which device it
+"""mobile-touch.sh: what each gesture passes to the program on the device, percentages, which device it
 acts on, and how it fails."""
 import shutil
 import unittest
@@ -15,7 +15,7 @@ class TouchTestCase(ScriptTestCase):
         self.sandbox.add_avd("phone_api36")
 
     def touch(self, *args, env=None):
-        return self.sandbox.run("touch.sh", *args, env=env)
+        return self.sandbox.run("mobile-touch.sh", *args, env=env)
 
     def gestures(self, serial):
         return self.sandbox.device_state(serial)["gestures"]
@@ -108,7 +108,7 @@ class Gestures(TouchTestCase):
         # adb shell forwards its stdin, which would swallow what a loop feeds on.
         tools = self.sandbox.tools / "bin"
         result = self.sandbox.bash(f"printf '1\\n2\\n3\\n' | while read -r n; do "
-                                   f"{tools}/touch.sh long-press \"$n%\" 2; done")
+                                   f"{tools}/mobile-touch.sh long-press \"$n%\" 2; done")
         self.assertSucceeded(result)
         self.assertEqual(len(self.gestures(self.serial)), 3)
 
@@ -262,7 +262,7 @@ class WhichDevice(TouchTestCase):
     def test_no_emulator_names_start_emulator(self):
         result = self.touch("tap", "1", "1")
         self.assertFailed(result, "no running emulator. Start one with:", code=1)
-        self.assertIn("start-emulator.sh", result.err)
+        self.assertIn("mobile-start-emulator.sh", result.err)
 
     def test_a_physical_device_is_not_picked_for_an_emulator(self):
         self.sandbox.connect_device("R58M123ABC")
@@ -303,7 +303,7 @@ class WrongArguments(TouchTestCase):
     def assertRefused(self, *args):
         result = self.touch(*args)
         self.assertEqual(result.code, 2, result.output)
-        self.assertIn("Usage: touch.sh", result.err)
+        self.assertIn("Usage: mobile-touch.sh", result.err)
         self.assertEqual(self.sandbox.argvs("adb"), [], "adb must not be called")
 
     def test_no_gesture(self):
@@ -350,7 +350,7 @@ class WrongArguments(TouchTestCase):
 
     def test_nothing_else_is_needed_for_the_usage(self):
         # No SDK at all: arguments come first.
-        result = self.sandbox.run("touch.sh", "tap", env={"ANDROID_HOME": "/nonexistent"})
+        result = self.sandbox.run("mobile-touch.sh", "tap", env={"ANDROID_HOME": "/nonexistent"})
         self.assertEqual(result.code, 2, result.output)
 
     def test_help_goes_to_stdout(self):
@@ -358,7 +358,7 @@ class WrongArguments(TouchTestCase):
             with self.subTest(flag):
                 result = self.touch(flag)
                 self.assertSucceeded(result)
-                self.assertIn("Usage: touch.sh", result.out)
+                self.assertIn("Usage: mobile-touch.sh", result.out)
                 self.assertEqual(result.err, "")
 
 
@@ -378,7 +378,7 @@ class WhenItFails(TouchTestCase):
     def test_shows_the_programs_output_without_adbs_carriage_returns(self):
         # Through grep: a test's text output doesn't show them.
         self.sandbox.set_behavior(gesture_output="Android refused event 0")
-        result = self.sandbox.bash(f"{self.sandbox.tools}/bin/touch.sh tap 1 1 2>&1 | grep -c $'\\r'")
+        result = self.sandbox.bash(f"{self.sandbox.tools}/bin/mobile-touch.sh tap 1 1 2>&1 | grep -c $'\\r'")
         self.assertEqual(result.out, "0\n")
 
     def test_reads_the_failure_from_the_output_before_api_24(self):
@@ -429,8 +429,8 @@ class WhenItFails(TouchTestCase):
 
 
 class TheProgram(unittest.TestCase):
-    """What can be told of the real program without a device: it's a dex, and it knows what touch.sh
-    asks of it and what touch.sh reads from it."""
+    """What can be told of the real program without a device: it's a dex, and it knows what mobile-touch.sh
+    asks of it and what mobile-touch.sh reads from it."""
 
     def test_is_a_dex_that_knows_every_gesture(self):
         dex = (LIB / "Gesture.dex").read_bytes()
@@ -442,9 +442,9 @@ class TheProgram(unittest.TestCase):
 
 class Usage(ScriptTestCase):
     def test_without_any_sdk(self):
-        self.assertFailed(self.sandbox.run("touch.sh", "tap", "1", "1"), "no Android SDK found", code=1)
+        self.assertFailed(self.sandbox.run("mobile-touch.sh", "tap", "1", "1"), "no Android SDK found", code=1)
 
     def test_names_the_missing_package(self):
         self.sandbox.install_sdk(tools=["emulator"])
-        self.assertFailed(self.sandbox.run("touch.sh", "tap", "1", "1"),
+        self.assertFailed(self.sandbox.run("mobile-touch.sh", "tap", "1", "1"),
                           'android sdk install --no-metrics "platform-tools"', code=1)

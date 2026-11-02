@@ -8,29 +8,28 @@ first: [`SETUP.md`](SETUP.md). Using a running one: [`DRIVING.md`](DRIVING.md).
 The [emulator tier](../tests/README.md#the-emulator-tier) passes on each of these:
 
 - **Plain (AOSP) x86_64 images: API 21 to 37**, every level, as `phone_api<level>`.
-- **Google APIs images: API 21 to 37, and 36.1**, every level, x86_64 except API 27's, which is x86, as
-  `phone_gapi<level>`.
+- **Google APIs images: API 21 to 37, and 36.1**, every level, x86_64 except API 27's, which is x86,
+  as `phone_gapi<level>`.
 - **Tablets:** `tablet_api30` and `tablet_api36`, from the plain images.
 
-A foldable (`pixel_9_pro_fold`, API 36) boots and lists its folded states, but the tier hasn't run on
-one. Untested: the
-Google Play images (`google_apis_playstore`), which have no root; the 16 KB page size images; and any
-level below 21.
+A foldable (`pixel_9_pro_fold`, API 36) boots and lists its folded states, but the tier hasn't run
+on one. Untested: the Google Play images (`google_apis_playstore`), which have no root; the 16 KB
+page size images; and any level below 21.
 
 ## Creating one
 
-`create-avd.sh [--api <level>] [--google-apis] [--tablet] [--device <profile>] [--size <W>x<H>]
-[--density <dpi>] [--if-missing] [name]`
+`mobile-create-avd.sh [--api <level>] [--google-apis] [--tablet] [--device <profile>] [--size
+<W>x<H>] [--density <dpi>] [--if-missing] [name]`
 
 ```bash
-create-avd.sh                        # phone_api36: Android 16
-create-avd.sh --api 24               # phone_api24: Android 7.0
-create-avd.sh --api 37               # phone_api37: Android 17
-create-avd.sh --api 30 my_phone      # the same image under another name
-create-avd.sh --tablet --api 34      # tablet_api34: a tablet on Android 14
-create-avd.sh --google-apis --api 34  # phone_gapi34: with Google Play services
-create-avd.sh --device pixel_9_pro_fold --api 36   # pixel_9_pro_fold_api36: any device profile
-create-avd.sh --size 720x1280 --density 320 small_phone   # another screen
+mobile-create-avd.sh                 # phone_api36: Android 16
+mobile-create-avd.sh --api 24        # phone_api24: Android 7.0
+mobile-create-avd.sh --api 37        # phone_api37: Android 17
+mobile-create-avd.sh --api 30 my_phone  # the same image under another name
+mobile-create-avd.sh --tablet --api 34  # tablet_api34: a tablet on Android 14
+mobile-create-avd.sh --google-apis --api 34  # phone_gapi34: with Google Play services
+mobile-create-avd.sh --device pixel_9_pro_fold --api 36  # pixel_9_pro_fold_api36: any device profile
+mobile-create-avd.sh --size 720x1280 --density 320 small_phone  # another screen
 ```
 
 It creates the AVD from the image of that level, `system-images;android-<level>;default;x86_64`
@@ -52,9 +51,9 @@ with the `medium_phone` device profile (`medium_tablet` with `--tablet`), then s
 The device profiles have a multi-touch screen (`hw.screen=multi-touch`) and an on-screen navigation
 bar (`hw.mainKeys=no`), so nothing else is needed for touch.
 
-`--size <W>x<H>` and `--density <dpi>` replace the profile's screen (`hw.lcd.width`, `hw.lcd.height`,
-`hw.lcd.density`); each one given alone keeps the profile's value for the other. `avdmanager list
-device -c` lists the profiles for `--device`.
+`--size <W>x<H>` and `--density <dpi>` replace the profile's screen (`hw.lcd.width`,
+`hw.lcd.height`, `hw.lcd.density`); each one given alone keeps the profile's value for the other.
+`avdmanager list device -c` lists the profiles for `--device`.
 
 With `--api`, the default name follows the level even when `$AWDT_AVD` is set, so a second AVD
 doesn't take the name of your everyday one. Images from API 37 on live in a folder with a minor
@@ -68,11 +67,11 @@ it to avdmanager as `ANDROID_AVD_HOME`, because avdmanager left to itself can pi
 cmdline-tools 12.0, the version on GitHub's runners, uses `$XDG_CONFIG_HOME/.android/avd` when
 `XDG_CONFIG_HOME` is set, and the emulator never finds an AVD there.
 
-It never overwrites an existing AVD: it fails instead (exit 1). To recreate one:
-`avdmanager delete avd -n phone_api36 && create-avd.sh`. For scripts and CI jobs that cache their
-AVDs, `--if-missing` accepts an existing AVD made from the same system image and leaves it as it is
-(exit 0); one of the same name from another image, or with another `--size` or `--density` than the
-ones given, is still an error.
+It never overwrites an existing AVD: it fails instead (exit 1). To recreate one: `avdmanager delete
+avd -n phone_api36 && mobile-create-avd.sh`. For scripts and CI jobs that cache their AVDs,
+`--if-missing` accepts an existing AVD made from the same system image and leaves it as it is (exit
+0); one of the same name from another image, or with another `--size` or `--density` than the ones
+given, is still an error.
 
 ### The renderer
 
@@ -80,9 +79,9 @@ The AVDs render with `swangle_indirect`: software rendering, so it works on any 
 and needs no GPU. The emulator's usual software renderer, `swiftshader_indirect`, makes System UI
 miss its startup limit on API 36 and 37 ("failed to complete startup"), on every cold boot, and
 leaves "System UI isn't responding" over the home screen: that dialog doesn't close with Back, and
-takes every touch until `ui.sh tap Wait`. With `swangle_indirect` that doesn't happen, the boot is
-faster, and the emulator takes less memory. A `-gpu` flag of your own replaces it for one boot, and
-AWDT_TEST_EMULATOR_FLAGS for the tests.
+takes every touch until `mobile-ui.sh tap Wait`. With `swangle_indirect` that doesn't happen, the
+boot is faster, and the emulator takes less memory. A `-gpu` flag of your own replaces it for one
+boot, and AWDT_TEST_EMULATOR_FLAGS for the tests.
 
 ### Other screens
 
@@ -97,25 +96,25 @@ For a screen you test on often, make an AVD of it with `--size`, `--density` or 
 
 ## Booting one
 
-`start-emulator.sh [--quick] [--wait-for-home] [name] [emulator flags…]`
+`mobile-start-emulator.sh [--quick] [--wait-for-home] [name] [emulator flags…]`
 
 ```bash
-start-emulator.sh                          # cold boot the default AVD
-start-emulator.sh phone_api30              # another AVD
-start-emulator.sh --quick                  # boot from its Quick Boot snapshot instead
-start-emulator.sh --wait-for-home          # also wait until the home screen has settled (tests, CI)
-start-emulator.sh -wipe-data               # factory reset
-start-emulator.sh my_phone -gpu host       # another AVD, another renderer
-EMULATOR_TOOLBAR=show start-emulator.sh    # keep the side toolbar (WSLG.md)
+mobile-start-emulator.sh                   # cold boot the default AVD
+mobile-start-emulator.sh phone_api30       # another AVD
+mobile-start-emulator.sh --quick           # boot from its Quick Boot snapshot instead
+mobile-start-emulator.sh --wait-for-home   # also wait until the home screen has settled (tests, CI)
+mobile-start-emulator.sh -wipe-data        # factory reset
+mobile-start-emulator.sh my_phone -gpu host  # another AVD, another renderer
+EMULATOR_TOOLBAR=show mobile-start-emulator.sh  # keep the side toolbar (WSLG.md)
 ```
 
-It runs `emulator -avd <name> -gpu swangle_indirect -no-snapshot-load -no-boot-anim -no-audio` in the
-background (a `-gpu` flag of your own replaces the default), logs to
+It runs `emulator -avd <name> -gpu swangle_indirect -no-snapshot-load -no-boot-anim -no-audio` in
+the background (a `-gpu` flag of your own replaces the default), logs to
 `${TMPDIR:-/tmp}/emulator-<name>.log`, finds the emulator's serial by asking each running emulator
-for its AVD name, waits until `sys.boot_completed=1` (so it can be chained with
-`./gradlew installDebug`), and on WSL finishes with `wslg-toolbar.py <name> hide`. If the emulator
-exits during boot, it stops waiting and prints how it exited (its exit status, or the signal that
-killed it) and the end of the log.
+for its AVD name, waits until `sys.boot_completed=1` (so it can be chained with `./gradlew
+installDebug`), and on WSL finishes with `mobile-wslg-toolbar.py <name> hide`. If the emulator exits
+during boot, it stops waiting and prints how it exited (its exit status, or the signal that killed
+it) and the end of the log.
 
 **Already running.** An AVD that's already running isn't started again, but it may still be
 booting, e.g. started by another call or CI step a moment ago. The script then waits for its boot
@@ -146,7 +145,7 @@ left running.
 message goes to stderr. So scripts capture it without parsing messages:
 
 ```bash
-serial="$(start-emulator.sh)" && export ANDROID_SERIAL="$serial"
+serial="$(mobile-start-emulator.sh)" && export ANDROID_SERIAL="$serial"
 ```
 
 **Without a display.** The emulator's window needs an X display: without `$DISPLAY` (a CI runner,
@@ -177,14 +176,14 @@ group but this session predates it, it re-runs itself through `sg kvm` instead.
 
 ## Stopping one
 
-`stop-emulator.sh [--all] [--no-save] [name|serial]`
+`mobile-stop-emulator.sh [--all] [--no-save] [name|serial]`
 
 ```bash
-stop-emulator.sh                   # $ANDROID_SERIAL, else the only running emulator
-stop-emulator.sh phone_api36          # by AVD name
-stop-emulator.sh emulator-5556     # by serial
-stop-emulator.sh --all             # every running emulator
-stop-emulator.sh --no-save --all   # every running emulator, without saving first
+mobile-stop-emulator.sh            # $ANDROID_SERIAL, else the only running emulator
+mobile-stop-emulator.sh phone_api36   # by AVD name
+mobile-stop-emulator.sh emulator-5556  # by serial
+mobile-stop-emulator.sh --all      # every running emulator
+mobile-stop-emulator.sh --no-save --all  # every running emulator, without saving first
 ```
 
 It runs `adb -s <serial> emu kill` and returns once the emulator's process has exited, so the
@@ -236,22 +235,23 @@ versions' TV images:
 
 So a change is safe 15 s after it at the latest. **Wait 30 s before stopping the emulator after
 a change that should stay**: twice that. `adb reboot` and `adb shell reboot -p` don't save it
-either. `stop-emulator.sh` needs no wait: it has Android save first.
+either. `mobile-stop-emulator.sh` needs no wait: it has Android save first.
 
 ### Without saving
 
-`--no-save`: from API 33 on, the save waits all of `AWDT_SAVE_WAIT` when
-nothing is pending, since Android shows no sign of a write it has yet to make. When the changes
-since Android's last save don't matter, e.g. after a test run whose state you don't want to keep,
-`--no-save` skips the save, with a named emulator or with `--all`: the stop is as fast as on API
-31, and whatever Android hadn't saved yet is lost, as with `adb emu kill`. Leave it out after a
-change that should stay, such as an app you disabled or a setting you changed. Never use it on a new AVD's first boot: [API 23's next boot hangs](#what-the-images-do-on-their-own).
+`--no-save`: from API 33 on, the save waits all of `AWDT_SAVE_WAIT` when nothing is pending, since
+Android shows no sign of a write it has yet to make. When the changes since Android's last save
+don't matter, e.g. after a test run whose state you don't want to keep, `--no-save` skips the save,
+with a named emulator or with `--all`: the stop is as fast as on API 31, and whatever Android hadn't
+saved yet is lost, as with `adb emu kill`. Leave it out after a change that should stay, such as an
+app you disabled or a setting you changed. Never use it on a new AVD's first boot: [API 23's next
+boot hangs](#what-the-images-do-on-their-own).
 
 ### When it can't stop
 
 `adb emu kill` alone returns at once, before the emulator has exited, and
 `adb wait-for-disconnect` waits for that without a time limit. Neither can stop an emulator whose
-console doesn't answer, so a script built on them can hang. `stop-emulator.sh` always ends:
+console doesn't answer, so a script built on them can hang. `mobile-stop-emulator.sh` always ends:
 
 | What happens | What it does |
 |---|---|
@@ -310,13 +310,13 @@ after the other: a running emulator takes [up to a few GB of memory](SETUP.md#si
 
 ```bash
 for avd in phone_api24 phone_api30 phone_api36; do
-    start-emulator.sh --wait-for-home "$avd" && ./gradlew connectedDebugAndroidTest
-    stop-emulator.sh --no-save "$avd"
+    mobile-start-emulator.sh --wait-for-home "$avd" && ./gradlew connectedDebugAndroidTest
+    mobile-stop-emulator.sh --no-save "$avd"
 done
 ```
 
 With several devices connected, `adb` refuses to guess, and `./gradlew installDebug` installs on all
-of them. Set `ANDROID_SERIAL` to the serial `start-emulator.sh` prints to use only that one.
+of them. Set `ANDROID_SERIAL` to the serial `mobile-start-emulator.sh` prints to use only that one.
 
 ## What the images do on their own
 
@@ -330,7 +330,7 @@ may run into:
 | 23 | A new AVD's first boot must be saved: [stopped with `--no-save`](#without-saving), its next boot with a window hangs (below). |
 | 23 on | The launcher is `com.android.launcher3`. |
 | 24 on | Until the user is unlocked after a boot, a HOME intent resolves to Settings' `FallbackHome`. |
-| Before 26 | `adb shell input` has no `draganddrop`, so no way to hold a touch and then move it; `touch.sh` has. |
+| Before 26 | `adb shell input` has no `draganddrop`, so no way to hold a touch and then move it; `mobile-touch.sh` has. |
 | Before 28 | The images don't declare Wi-Fi Direct (`android.hardware.wifi.direct`). |
 | 29 | `dumpsys window` names the focused app twice. |
 | Before 30 | `adb shell input` has no `motionevent`. `adb shell cmd uimode` doesn't work on the levels tried (21, 24). |
@@ -338,12 +338,12 @@ may run into:
 | 36, 37 | Only `swiftshader_indirect` makes System UI miss its startup limit ([the renderer](#the-renderer)). |
 
 On the Google APIs images the launcher can differ (`com.google.android.apps.nexuslauncher` on recent
-levels). `start-emulator.sh --wait-for-home` asks Android which one it is, and names it.
+levels). `mobile-start-emulator.sh --wait-for-home` asks Android which one it is, and names it.
 
 **The hang on API 23.** Each image runs a one-time setup activity (`com.android.sdksetup`) on a new
 AVD's first boot. When a stop throws away what that boot had yet to save, the next boot runs it
 again, and with a window it stays `FINISHING` under a keyguard that never draws, so
-`sys.boot_completed` never comes. The boot after that one works. `stop-emulator.sh` saves by
+`sys.boot_completed` never comes. The boot after that one works. `mobile-stop-emulator.sh` saves by
 default, so only `--no-save` right after a new AVD's first boot leads there.
 
 ## What an emulator can't do
@@ -353,12 +353,12 @@ An emulator runs Android, not a phone's radios. Seen on these images:
 - **No Miracast, no Wi-Fi Display.** The display service has no `WifiDisplayAdapter` (`adb shell
   dumpsys display` lists the adapters), so an app finds no Wi-Fi display to connect to, and only a
   physical device can tell whether its build has one.
-- **No Wi-Fi Direct in practice.** From API 28 on the images declare the feature, but Wi-Fi P2P stays
-  in `P2pDisabledState` (`adb shell dumpsys wifip2p`), with no interface for it.
+- **No Wi-Fi Direct in practice.** From API 28 on the images declare the feature, but Wi-Fi P2P
+  stays in `P2pDisabledState` (`adb shell dumpsys wifip2p`), with no interface for it.
 - **A second screen works.** An overlay display is a real `Presentation` target, with
   `FLAG_PRESENTATION` ([how](DRIVING.md#changing-the-device)), so what an app shows there can be
   developed here.
 
 **Wi-Fi** itself works from API 24 on: the emulator's own `AndroidWifi` network. Foldables work as a
-device profile (`create-avd.sh --device pixel_9_pro_fold --api 36`), with their folded states
+device profile (`mobile-create-avd.sh --device pixel_9_pro_fold --api 36`), with their folded states
 (`adb shell cmd device_state print-states`).

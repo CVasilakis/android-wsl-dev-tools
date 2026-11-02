@@ -38,14 +38,14 @@ ENABLED = os.environ.get("AWDT_EMULATOR_TESTS") == "1"
 # starved of CPU.
 EVENT_TIMEOUT = 60   # from a gesture's end until the app has logged it
 FOCUS_TIMEOUT = 60   # for an app's activity to come to the front
-TOUCH_LIMIT = 120    # for touch.sh or ui.sh to return: the limit of their adb calls, and more
+TOUCH_LIMIT = 120  # for mobile-touch.sh or mobile-ui.sh to return: the limit of their adb calls, and more
 
 # How far from its end, in px, a moved touch may be released: Android resamples a moving touch for
 # the app, and the release can keep that position (5 px off on API 24).
 MOVED_MARGIN = 12
 
 # Python's limits for the scripts, from the scripts' own: when Python stops a script on the way,
-# its emulator can be left running (start-emulator.sh starts it with nohup), so a script must
+# its emulator can be left running (mobile-start-emulator.sh starts it with nohup), so a script must
 # always reach its own limits first, and clean up and say why. Each adb call they make gets
 # ADB_CALL s (adb_bounded in device.sh: ADB_TIMEOUT s, then SIGKILL ADB_KILL_AFTER s later), and each
 # of their limits lasts up to 1 s longer (time_is_up in device.sh). ADB_CALLS is more than either
@@ -55,21 +55,21 @@ ADB_TIMEOUT = 15
 ADB_KILL_AFTER = 5
 ADB_CALL = ADB_TIMEOUT + ADB_KILL_AFTER
 ADB_CALLS = 10
-TERM_WAIT = 30   # start-emulator.sh's, for an emulator it stops to exit after SIGTERM
-KILL_WAIT = 30   # stop-emulator.sh's, for a killed emulator to exit, and again for adb to unlist it
-STOP_SAVE_WAIT = 12  # stop-emulator.sh's SAVE_WAIT, from API 33 on, for Android to save app states
-BOOT_TIMEOUT = int(os.environ.get("AWDT_BOOT_TIMEOUT") or 900)   # passed on to start-emulator.sh
+TERM_WAIT = 30  # mobile-start-emulator.sh's, for an emulator it stops to exit after SIGTERM
+KILL_WAIT = 30  # mobile-stop-emulator.sh's, for a killed emulator to exit, and again for adb to unlist it
+STOP_SAVE_WAIT = 12  # mobile-stop-emulator.sh's SAVE_WAIT, from API 33 on, for Android to save app states
+BOOT_TIMEOUT = int(os.environ.get("AWDT_BOOT_TIMEOUT") or 900)  # passed on to mobile-start-emulator.sh
 HOME_TIMEOUT = int(os.environ.get("AWDT_HOME_TIMEOUT") or 600)   # and to its --wait-for-home
-STOP_TIMEOUT = int(os.environ.get("AWDT_STOP_TIMEOUT") or 60)    # passed on to stop-emulator.sh
+STOP_TIMEOUT = int(os.environ.get("AWDT_STOP_TIMEOUT") or 60)  # passed on to mobile-stop-emulator.sh
 # home.sh's wait_for_home: its limit, then its pause between two looks and a last look of up to
 # five adb calls (the API level, what HOME resolves to, two dumps, a Back).
 HOME_LIMIT = HOME_TIMEOUT + 1 + 1 + 5 * ADB_CALL if HOME_TIMEOUT else None
-# start-emulator.sh: the boot limit; with --wait-for-home, that wait; then stopping an emulator that
+# mobile-start-emulator.sh: the boot limit; with --wait-for-home, that wait; then stopping an emulator that
 # didn't boot or settle (SIGTERM, TERM_WAIT s, then SIGKILL). No limit when a limit is 0 (the
 # script's own "no limit").
 START_LIMIT = (BOOT_TIMEOUT + 1 + HOME_LIMIT + TERM_WAIT + 1 + ADB_CALLS * ADB_CALL
                if BOOT_TIMEOUT and HOME_LIMIT else None)
-# stop-emulator.sh: the save, the emulator's exit, then a kill and adb unlisting it.
+# mobile-stop-emulator.sh: the save, the emulator's exit, then a kill and adb unlisting it.
 STOP_LIMIT = STOP_SAVE_WAIT + 2 * STOP_TIMEOUT + 2 * KILL_WAIT + ADB_CALLS * ADB_CALL
 
 
@@ -104,8 +104,8 @@ def exited(pid):
 
 
 def start_script(*args, env=None):
-    """Runs start-emulator.sh, which gives up on a boot before Python gives up on it."""
-    return subprocess.run([str(BIN / "start-emulator.sh"), *args], capture_output=True, text=True,
+    """Runs mobile-start-emulator.sh, which gives up on a boot before Python gives up on it."""
+    return subprocess.run([str(BIN / "mobile-start-emulator.sh"), *args], capture_output=True, text=True,
                           timeout=START_LIMIT,
                           env={**os.environ, "AWDT_BOOT_TIMEOUT": str(BOOT_TIMEOUT),
                                "AWDT_HOME_TIMEOUT": str(HOME_TIMEOUT), **(env or {})})
@@ -120,9 +120,9 @@ def start(avd, *flags, env=None):
 
 
 def stop(target, stop_timeout=STOP_TIMEOUT):
-    """Runs stop-emulator.sh. It saves, although a test run's changes don't matter: a new AVD's
+    """Runs mobile-stop-emulator.sh. It saves, although a test run's changes don't matter: a new AVD's
     first boot must be saved, or API 23's next boot hangs (docs/EMULATORS.md)."""
-    return subprocess.run([str(BIN / "stop-emulator.sh"), target],
+    return subprocess.run([str(BIN / "mobile-stop-emulator.sh"), target],
                           capture_output=True, text=True, timeout=STOP_LIMIT,
                           env={**os.environ, "AWDT_STOP_TIMEOUT": str(stop_timeout)})
 
@@ -169,10 +169,10 @@ class Device:
         return self.adb("shell", *args).stdout.replace("\r", "")
 
     def touch(self, *args):
-        return self.tool("touch.sh", *args)
+        return self.tool("mobile-touch.sh", *args)
 
     def ui(self, *args):
-        return self.tool("ui.sh", *args)
+        return self.tool("mobile-ui.sh", *args)
 
     def tool(self, name, *args):
         return subprocess.run([str(BIN / name), *map(str, args)], capture_output=True, text=True,
@@ -257,7 +257,7 @@ class OnTheRealEmulator(unittest.TestCase):
     def setUpClass(cls):
         cls.avd = default_avd()
         if not cls.avd:
-            raise unittest.SkipTest("no phone or tablet AVD: create one with create-avd.sh")
+            raise unittest.SkipTest("no phone or tablet AVD: create one with mobile-create-avd.sh")
         cls.started = None
         serial = serial_of(cls.avd)
         cls.was_running = bool(serial)
@@ -511,7 +511,7 @@ class StopOnTheRealEmulator(unittest.TestCase):
     def setUp(self):
         self.avd = default_avd()
         if not self.avd:
-            self.skipTest("no phone or tablet AVD: create one with create-avd.sh")
+            self.skipTest("no phone or tablet AVD: create one with mobile-create-avd.sh")
         if serial_of(self.avd):
             self.skipTest(f"{self.avd} is running, and a test doesn't stop the developer's "
                           "emulator")

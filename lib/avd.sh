@@ -36,7 +36,7 @@ list_avds() {
     "$EMULATOR" -list-avds 2>/dev/null | grep -E '^[A-Za-z0-9._-]+$' || true
 }
 
-# The AVD create-avd.sh makes by default, which start-emulator.sh boots by default.
+# The AVD mobile-create-avd.sh makes by default, which mobile-start-emulator.sh boots by default.
 DEFAULT_API=36
 DEFAULT_AVD="phone_api$DEFAULT_API"
 

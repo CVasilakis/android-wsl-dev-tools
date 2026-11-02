@@ -28,13 +28,12 @@ too. The emulator tier isn't run there; run it locally before a release.
 | emulator | [`emulator/`](emulator) | Your SDK and AVD (`AWDT_AVD` picks one) | What fakes can't show: see [below](#the-emulator-tier). |
 
 Some hermetic tests skip, with the reason printed, when an optional tool is missing:
-- **Xvfb** (`sudo apt-get install -y xvfb`) for
-  the `wslg-toolbar.py` tests, which create emulator-like windows on a private X server. It runs on
-  the first free display from `:99` up, reachable only through an abstract socket: under WSLg
-  `/tmp/.X11-unix` is read-only, and a low display number would capture the desktop's own apps. It
-  runs with `-noreset`: each test's windows live on their own connection, so between two tests the
-  server has no clients; by default it resets then, and the next test's connection can fail while
-  it does, more often the busier the machine.
+- **Xvfb** (`sudo apt-get install -y xvfb`) for the `mobile-wslg-toolbar.py` tests, which create
+  emulator-like windows on a private X server. It runs on the first free display from `:99` up,
+  reachable only through an abstract socket: under WSLg `/tmp/.X11-unix` is read-only, and a low
+  display number would capture the desktop's own apps. It runs with `-noreset`: each test's windows
+  live on their own connection, so between two tests the server has no clients; by default it resets
+  then, and the next test's connection can fail while it does, more often the busier the machine.
   `SCRIPT_TESTS_DISPLAY=:0` runs the tests on an existing display instead; under WSLg you'll see
   small windows flash. Only use it to watch, with no Linux GUI app open that you'd mind losing:
   WSLg's compositor can crash during such a run, which closes every Linux GUI app and breaks the
@@ -45,39 +44,41 @@ Some hermetic tests skip, with the reason printed, when an optional tool is miss
 ## The emulator tier
 
 It covers what only a real device shows, by what reaches an app: it installs
-[`emulator/TouchProbe.apk`](emulator/probe), which logs each touch it gets, what Android's own gesture
-detectors made of them, and how far two fingers moved; and removes it afterwards.
+[`emulator/TouchProbe.apk`](emulator/probe), which logs each touch it gets, what Android's own
+gesture detectors made of them, and how far two fingers moved; and removes it afterwards.
 
 - **Booting:** the boot completes, `--wait-for-home` returns with the home app in front, and no app
   was reported as not responding meanwhile.
 - **Gestures:** each one lands where it was asked for and is recognized as what it is, percentages
   included, on a screen as it's turned.
-- **The screen:** `ui.sh` lists, finds, taps, types, waits and takes screenshots on a real screen.
+- **The screen:** `mobile-ui.sh` lists, finds, taps, types, waits and takes screenshots on a real
+  screen.
 - **The mouse:** the real emulator window on a private X server, with real pointer events (XTest,
-  which WSLg's own display ignores), so a click, a held button and a drag are checked as touches. That
-  covers everything from the X server on, not WSLg's own way to it, which needs a real mouse.
-- **Stopping:** `stop-emulator.sh` returns only once the AVD can start again, also for a `-read-only`
-  emulator, which writes no lock file, a frozen one, and one that's exiting already.
+  which WSLg's own display ignores), so a click, a held button and a drag are checked as touches.
+  That covers everything from the X server on, not WSLg's own way to it, which needs a real mouse.
+- **Stopping:** `mobile-stop-emulator.sh` returns only once the AVD can start again, also for a
+  `-read-only` emulator, which writes no lock file, a frozen one, and one that's exiting already.
 
 The tier reuses the AVD if it's already running and leaves it running. Otherwise it boots it (cold)
-with `--wait-for-home -no-window -no-snapshot-save`, and stops it at the end. The tests that need the
-AVD to themselves skip when it was already running. `AWDT_TEST_EMULATOR_FLAGS` adds emulator flags to
-the boots it makes. It tests one AVD per run; to cover every [tested
+with `--wait-for-home -no-window -no-snapshot-save`, and stops it at the end. The tests that need
+the AVD to themselves skip when it was already running. `AWDT_TEST_EMULATOR_FLAGS` adds emulator
+flags to the boots it makes. It tests one AVD per run; to cover every [tested
 image](../docs/EMULATORS.md#tested-images), one emulator at a time:
 
 ```bash
 for l in 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37; do
-    create-avd.sh --api $l --if-missing
+    mobile-create-avd.sh --api $l --if-missing
     AWDT_AVD=phone_api$l tests/run.py --emulator
 done
 ```
 
 Its time limits hold for an emulator starved of CPU: a wait ends as soon as what it waits for is
-there, so a long limit only makes a failure slower. Its limits for `start-emulator.sh` and
-`stop-emulator.sh` are longer than the scripts' own, computed from them
-([`test_conventions.py`](hermetic/test_conventions.py) checks the copies): a script always gets to its
-own limit, stops what it started and says why, whereas Python stopping `start-emulator.sh` would leave
-its emulator booting. An emulator the tier boots is stopped at the end even when its boot failed.
+there, so a long limit only makes a failure slower. Its limits for `mobile-start-emulator.sh` and
+`mobile-stop-emulator.sh` are longer than the scripts' own, computed from them
+([`test_conventions.py`](hermetic/test_conventions.py) checks the copies): a script always gets to
+its own limit, stops what it started and says why, whereas Python stopping
+`mobile-start-emulator.sh` would leave its emulator booting. An emulator the tier boots is stopped
+at the end even when its boot failed.
 
 ## Layout
 
@@ -106,9 +107,9 @@ the `\r` adb adds), exit codes and side effects. For example, the fake emulator 
 first free port, writes its PID into its AVD's `hardware-qemu.ini.lock` as the real one does, and
 stays alive until `adb emu kill`. The fake `adb push` puts a file on the fake device, where the
 gesture program's `[ -f <path> ]` then finds it; the program records its arguments on the device;
-`uiautomator dump` writes a made-up hierarchy to the device's files, for `adb exec-out cat`. The fake
-`python3` runs `lib/ui_tree.py` for real, and stands in for `wslg-toolbar.py`. All fakes share state
-in the sandbox, so a test can arrange a situation and then check the result:
+`uiautomator dump` writes a made-up hierarchy to the device's files, for `adb exec-out cat`. The
+fake `python3` runs `lib/ui_tree.py` for real, and stands in for `mobile-wslg-toolbar.py`. All fakes
+share state in the sandbox, so a test can arrange a situation and then check the result:
 
 ```python
 class Example(ScriptTestCase):
@@ -117,7 +118,7 @@ class Example(ScriptTestCase):
         self.sandbox.add_avd("phone_api36")               # AVDs, as avdmanager lays them out
         self.sandbox.add_avd("tablet")
         self.sandbox.start_emulator("tablet")             # already running, takes emulator-5554
-        result = self.sandbox.run("start-emulator.sh")    # the real script
+        result = self.sandbox.run("mobile-start-emulator.sh")  # the real script
         self.assertSucceeded(result)
         self.assertIn("booted as emulator-5556", result.err)
         self.assertEqual(self.sandbox.running(), {"emulator-5554": "tablet", "emulator-5556": "phone_api36"})
@@ -156,24 +157,24 @@ zombie until the cleanup reaps it).
   (`test_refuses_to_guess_between_several_phone_avds`) and assert on observable results. Don't
   source a script to call its internals. `lib/`'s functions are the exception, because they are its
   interface.
-- **Every bug fix and every new option gets a test** in the script's `test_<script>.py`. A new
-  script gets a new file; `test_conventions.py` already makes it provide `--help`, a shebang, and
+- **Every bug fix and every new option gets a test** in the script's `test_<script>.py`, named
+  without the `mobile-` prefix. A new script gets a new file; `test_conventions.py` already makes it provide `--help`, a shebang, and
   a line in [`../bin/README.md`](../bin/README.md).
 - **Stay hermetic.** A hermetic test never reads the real `$HOME`, SDK or devices. If a script
   needs a new external command, add a fake to `fake_tools.py` (or the command to `UTILITIES` in
   `sandbox.py` if it's a basic system utility).
-- **Wait for a condition, not for a time.** On a busy machine a script gets everywhere several
-  times later, so a test never sleeps on a fixed timer when it can wait for a condition with
-  `self.wait_until(condition)`. To stop an emulator while `start-emulator.sh` waits for its boot,
-  for example, start the script with `start_in_background()`
+- **Wait for a condition, not for a time.** On a busy machine a script gets everywhere several times
+  later, so a test never sleeps on a fixed timer when it can wait for a condition with
+  `self.wait_until(condition)`. To stop an emulator while `mobile-start-emulator.sh` waits for its
+  boot, for example, start the script with `start_in_background()`
   ([`test_start_emulator.py`](hermetic/test_start_emulator.py)) and wait until the calls show its
-  boot polls. To act while `wslg-toolbar.py show` has unmapped the toolbar, play the window manager
-  (`EmulatorWindows.set_wm_state()`): the script goes on only once the test has set the toolbar's
-  `WM_STATE` to Withdrawn. A time limit a test sets (`AWDT_BOOT_TIMEOUT=2`) must only end what never
-  finishes by design, not race what the script does on the way, and a check on how long a script
-  took belongs only where its output can't show which way it went. The scripts' own limits count
-  whole seconds (`$SECONDS`, through `time_is_up` in [`lib/device.sh`](../lib/device.sh)), so where
-  a test checks that one lasts its full length, it makes the script start it late in a second
+  boot polls. To act while `mobile-wslg-toolbar.py show` has unmapped the toolbar, play the window
+  manager (`EmulatorWindows.set_wm_state()`): the script goes on only once the test has set the
+  toolbar's `WM_STATE` to Withdrawn. A time limit a test sets (`AWDT_BOOT_TIMEOUT=2`) must only end
+  what never finishes by design, not race what the script does on the way, and a check on how long a
+  script took belongs only where its output can't show which way it went. The scripts' own limits
+  count whole seconds (`$SECONDS`, through `time_is_up` in [`lib/device.sh`](../lib/device.sh)), so
+  where a test checks that one lasts its full length, it makes the script start it late in a second
   (`adb_late`) and measures between the calls' times. `$SECONDS` follows the wall clock, which WSL
   can step forward, so such a check measures with `time.time()`, never `time.monotonic()`. To try a
   test on a busy machine, share one CPU with busy loops:
@@ -181,6 +182,7 @@ zombie until the cleanup reaps it).
   for i in $(seq 29); do timeout 600 taskset -c 0 bash -c 'while :; do :; done' & done
   taskset -c 0 tests/run.py -k <test>; kill $(jobs -p)
   ```
-- **Check that a new test can fail.** Break the behavior on purpose, see the test fail, then restore it.
+- **Check that a new test can fail.** Break the behavior on purpose, see the test fail, then restore
+  it.
 - Anything that needs the real emulator goes in `emulator/`, and must leave the developer's
   emulator as it found it.

@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Plays a touch gesture on the screen, for touch.sh: one mechanism on every API level, as the shell
+ * Plays a touch gesture on the screen, for mobile-touch.sh: one mechanism on every API level, as the shell
  * user (run with app_process), into the device's input, so the window under the fingers gets
  * MotionEvents as it gets a touchscreen's. `adb shell input` can't do this: each of its calls is a
  * process of its own, too slow for a double tap; it has one finger; and before API 26 it can't hold

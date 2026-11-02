@@ -24,14 +24,17 @@ The commands themselves are in [`bin/README.md`](bin/README.md).
 
 ## Rules
 
-- **Location-independent.** Scripts find `lib/` and each other through `readlink -f "$0"`/`$BIN_DIR`,
-  never through the current folder or `$PATH`. The only thing read from the current folder is the
-  project's `local.properties`. Messages that suggest another command use `command_for <script>`.
+- **Location-independent.** Scripts find `lib/` and each other through `readlink -f
+  "$0"`/`$BIN_DIR`, never through the current folder or `$PATH`. The only thing read from the
+  current folder is the project's `local.properties`. Messages that suggest another command use
+  `command_for <script>`.
 - **`lib/Gesture.dex` is built from `lib/Gesture.java`** by `lib/build-gesture.sh`, and
   `tests/emulator/TouchProbe.apk` from `tests/emulator/probe/` by its `build.sh`: rebuild and commit
   both sides whenever the source changes.
-- **`bin/` holds only commands**: users may put it on `PATH`. What they share goes in `lib/`, one job
-  per file ([`lib/README.md`](lib/README.md)); a script sources only what it needs.
+- **Every command starts with `mobile-`**, so it can share `PATH` with the sibling Android TV tools,
+  whose commands start with `tv-`, and a plain name never means one or the other.
+- **`bin/` holds only commands**: users may put it on `PATH`. What they share goes in `lib/`, one
+  job per file ([`lib/README.md`](lib/README.md)); a script sources only what it needs.
 - **Scope** ([`README.md`](README.md#scope)): phone and tablet apps, on Ubuntu under WSL2. Don't
   claim support for a distribution, image or API level that hasn't been tested, and update
   [Tested images](docs/EMULATORS.md#tested-images) when that changes.
@@ -91,27 +94,27 @@ anything.
 | What | Where | Why |
 |---|---|---|
 | `GPU_MODE=swangle_indirect` rather than the emulator's usual `swiftshader_indirect` | `lib/sdk.sh` | With `swiftshader_indirect`, every cold boot on API 36 and 37 ended with "System UI isn't responding" over the home screen, which takes every touch until tapped ([`docs/EMULATORS.md`](docs/EMULATORS.md#the-renderer)). |
-| Playing gestures with our own program rather than `adb shell input`; touches sent with the device's touchscreen as their device | `bin/touch.sh`, `lib/Gesture.java` | [`docs/DRIVING.md`](docs/DRIVING.md#touch). |
-| The dex's name holding its checksum | `bin/touch.sh` | A changed program must reach a device that holds the old one. |
-| Success read from the output, not `adb shell`'s exit status | `bin/touch.sh`, `bin/ui.sh` | Before API 24 `adb shell` always exits 0. |
-| `read_screen` asking `ui_tree.py` whether a dump parses, not only whether one came | `bin/ui.sh` | A dump cut short made `wait-gone` report that the element was gone. |
-| `grep … > /dev/null`, not `grep -q`, after a pipe from adb | `bin/ui.sh`, `bin/start-emulator.sh` | `grep -q` stops reading, and under `pipefail` that can fail a good look. |
+| Playing gestures with our own program rather than `adb shell input`; touches sent with the device's touchscreen as their device | `bin/mobile-touch.sh`, `lib/Gesture.java` | [`docs/DRIVING.md`](docs/DRIVING.md#touch). |
+| The dex's name holding its checksum | `bin/mobile-touch.sh` | A changed program must reach a device that holds the old one. |
+| Success read from the output, not `adb shell`'s exit status | `bin/mobile-touch.sh`, `bin/mobile-ui.sh` | Before API 24 `adb shell` always exits 0. |
+| `read_screen` asking `ui_tree.py` whether a dump parses, not only whether one came | `bin/mobile-ui.sh` | A dump cut short made `wait-gone` report that the element was gone. |
+| `grep … > /dev/null`, not `grep -q`, after a pipe from adb | `bin/mobile-ui.sh`, `bin/mobile-start-emulator.sh` | `grep -q` stops reading, and under `pipefail` that can fail a good look. |
 | `readlink -f` when sourcing `lib/` and in `TOOLS_DIR` | `bin/*.sh`, `lib/sdk.sh` | Scripts called through a symlink on `PATH` must still find the repository. |
-| AVD settings (`hw.keyboard`, `disk.dataPartition.size`, …) | `bin/create-avd.sh` | Each one's comment. |
+| AVD settings (`hw.keyboard`, `disk.dataPartition.size`, …) | `bin/mobile-create-avd.sh` | Each one's comment. |
 | `image_level`, `image_abi` | `lib/avd.sh` | Their comments: an image's folder isn't always `android-<level>/…/x86_64`. |
-| `sg kvm` re-exec (by the real path), waiting for `sys.boot_completed` | `bin/start-emulator.sh` | KVM access without restarting WSL; installing too early fails. |
-| Comparing `/dev/kvm`'s gid with the `kvm` group's | `bin/start-emulator.sh` | On WSL the device often belongs to no group, and then `usermod -aG kvm` can never help. |
-| Cold boot by default, the offline watchdog only with `--quick` | `bin/start-emulator.sh` | A restored snapshot can leave adb `offline` for good; a cold boot is offline for a while normally. |
-| Only the serial on stdout, every message on stderr | `bin/start-emulator.sh` | Scripts and CI capture the serial with `serial="$(start-emulator.sh)"`; it's part of the public interface. |
-| `-no-window` added when `$DISPLAY` is empty | `bin/start-emulator.sh` | Without a display the emulator aborts, and its log doesn't say why. |
-| `is_handheld_avd` | `bin/start-emulator.sh` | The AVD folder is shared with TV and other emulators. |
+| `sg kvm` re-exec (by the real path), waiting for `sys.boot_completed` | `bin/mobile-start-emulator.sh` | KVM access without restarting WSL; installing too early fails. |
+| Comparing `/dev/kvm`'s gid with the `kvm` group's | `bin/mobile-start-emulator.sh` | On WSL the device often belongs to no group, and then `usermod -aG kvm` can never help. |
+| Cold boot by default, the offline watchdog only with `--quick` | `bin/mobile-start-emulator.sh` | A restored snapshot can leave adb `offline` for good; a cold boot is offline for a while normally. |
+| Only the serial on stdout, every message on stderr | `bin/mobile-start-emulator.sh` | Scripts and CI capture the serial with `serial="$(mobile-start-emulator.sh)"`; it's part of the public interface. |
+| `-no-window` added when `$DISPLAY` is empty | `bin/mobile-start-emulator.sh` | Without a display the emulator aborts, and its log doesn't say why. |
+| `is_handheld_avd` | `bin/mobile-start-emulator.sh` | The AVD folder is shared with TV and other emulators. |
 | `install_hint`'s fallback to `sdkmanager` | `lib/sdk.sh` | `android` only ships from cmdline-tools 22.0. |
-| Toolbar hidden by default under WSL; everything in `bin/wslg-toolbar.py` | `bin/start-emulator.sh`, `bin/wslg-toolbar.py` | The script's docstring, [`docs/WSLG.md`](docs/WSLG.md). |
-| The PID from the console, else from the discovery files, else from `hardware-qemu.ini.lock`, each checked against the process's command line, instead of `pgrep` | `bin/stop-emulator.sh` | Its header: `pgrep -f` also matches the shell running it, and a hung console names nothing. |
+| Toolbar hidden by default under WSL; everything in `bin/mobile-wslg-toolbar.py` | `bin/mobile-start-emulator.sh`, `bin/mobile-wslg-toolbar.py` | The script's docstring, [`docs/WSLG.md`](docs/WSLG.md). |
+| The PID from the console, else from the discovery files, else from `hardware-qemu.ini.lock`, each checked against the process's command line, instead of `pgrep` | `bin/mobile-stop-emulator.sh` | Its header: `pgrep -f` also matches the shell running it, and a hung console names nothing. |
 | `time_is_up` instead of comparing `$SECONDS` with a limit | `lib/device.sh`, `bin/*.sh` | `$SECONDS` counts whole seconds, so a direct comparison can end a limit up to a second early. |
-| `id -nG "$(id -un)"` for kvm membership, not `$USER` or the `getent` line | `bin/start-emulator.sh` | Counts kvm as a primary group, doesn't mistake `ci` for `ci-bot`, and works where `$USER` is unset. |
+| `id -nG "$(id -un)"` for kvm membership, not `$USER` or the `getent` line | `bin/mobile-start-emulator.sh` | Counts kvm as a primary group, doesn't mistake `ci` for `ci-bot`, and works where `$USER` is unset. |
 | Everything `wait_for_home` checks | `lib/home.sh` | Its comment: a look can catch a state that's gone a moment later. |
-| Before `adb emu kill`, `dumpsys package write` or the wait for Android's own write, then `sync` | `bin/stop-emulator.sh` | `adb emu kill` doesn't shut Android down ([`docs/EMULATORS.md`](docs/EMULATORS.md#stopping-one)). |
+| Before `adb emu kill`, `dumpsys package write` or the wait for Android's own write, then `sync` | `bin/mobile-stop-emulator.sh` | `adb emu kill` doesn't shut Android down ([`docs/EMULATORS.md`](docs/EMULATORS.md#stopping-one)). |
 | Xvfb's `-noreset` | `tests/support/x11.py` | Without it the server resets between two tests, and the next test's connection fails under load. |
 | The emulator tier's limits for the scripts computed from the scripts' own; the class cleanup that stops its emulator, registered before the boot | `tests/emulator/test_on_emulator.py` | A script Python stops on the way can't stop the emulator it started, and `tearDownClass` isn't called when `setUpClass` fails. |
 | `AWDT_KVM_DEVICE`, `AWDT_PROC_VERSION`, `WSLG_TOOLBAR_TIMEOUT`, `AWDT_OFFLINE_TIMEOUT`, `AWDT_PROGRESS_INTERVAL`, `AWDT_ADB_TIMEOUT`, `AWDT_BACK_AFTER` | `lib/`, `bin/` | Let the tests simulate other machines and not wait 30 or 60 s ([`tests/README.md`](tests/README.md)). |
@@ -120,8 +123,9 @@ anything.
 
 Read these before driving an emulator:
 
-- [Touch](docs/DRIVING.md#touch) and [seeing the screen](docs/DRIVING.md#seeing-the-screen): gestures
-  and elements from a script. Host-level input (xdotool) doesn't reach the emulator under WSLg.
+- [Touch](docs/DRIVING.md#touch) and [seeing the screen](docs/DRIVING.md#seeing-the-screen):
+  gestures and elements from a script. Host-level input (xdotool) doesn't reach the emulator under
+  WSLg.
 - [What each image does on its own](docs/EMULATORS.md#what-the-images-do-on-their-own): what differs
   between API levels.
 - [What an emulator can't do](docs/EMULATORS.md#what-an-emulator-cant-do): when only a real phone

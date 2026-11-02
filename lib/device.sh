@@ -39,7 +39,7 @@ pick_device() {
     if [ -n "${ANDROID_SERIAL:-}" ]; then echo "$ANDROID_SERIAL"; return 0; fi
     mapfile -t emulators < <(running_emulators)
     case ${#emulators[@]} in
-        0) die "no running emulator. Start one with: $(command_for start-emulator.sh)" ;;
+        0) die "no running emulator. Start one with: $(command_for mobile-start-emulator.sh)" ;;
         1) echo "${emulators[0]}" ;;
         *) die "several emulators are running (${emulators[*]}). Name one with -s <serial>, or set \$ANDROID_SERIAL." ;;
     esac

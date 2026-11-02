@@ -10,9 +10,9 @@ under WSL2: create, boot and stop emulators on every Android version, touch thei
 what's on them, from a terminal, a script or a coding agent. They work with any Gradle project, and
 find the SDK, AVDs and emulators on their own.
 
-For Android TV, the same tools exist in
-[android-tv-wsl-dev-tools](https://github.com/CVasilakis/android-tv-wsl-dev-tools), whose commands
-start with `tv-`, so both can be on your `PATH`.
+The commands start with `mobile-`, as they cover phones and tablets. For Android TV, the same tools
+exist in [android-tv-wsl-dev-tools](https://github.com/CVasilakis/android-tv-wsl-dev-tools), whose
+commands start with `tv-`, so both can be on your `PATH`, and a name never means two things.
 
 ## Documentation
 
@@ -30,9 +30,10 @@ CI ([`docs/CI.md`](docs/CI.md)). macOS and native Windows aren't supported.
 **What:** phone and tablet apps, on x86_64 emulators with a touchscreen. TV, Wear OS and Automotive
 apps are out of scope: their emulators need other hardware settings and input.
 
-**A physical phone** works with `touch.sh` and `ui.sh` once adb sees it, as they only talk to adb,
-but that's untested, and getting adb in WSL to a phone is up to you. Anything an emulator can't do
-needs one: see [what an emulator can't do](docs/EMULATORS.md#what-an-emulator-cant-do).
+**A physical phone** works with `mobile-touch.sh` and `mobile-ui.sh` once adb sees it, as they only
+talk to adb, but that's untested, and getting adb in WSL to a phone is up to you. Anything an
+emulator can't do needs one: see [what an emulator can't
+do](docs/EMULATORS.md#what-an-emulator-cant-do).
 
 **Tested emulator images:** in [`docs/EMULATORS.md`](docs/EMULATORS.md#tested-images).
 
@@ -41,12 +42,13 @@ needs one: see [what an emulator can't do](docs/EMULATORS.md#what-an-emulator-ca
 1. Clone this repository anywhere, for example next to your projects.
 2. Follow [`docs/SETUP.md`](docs/SETUP.md), skipping the parts you already have (an Android Studio
    SDK or AVD works as is). It ends with booting the emulator from your project.
-3. Call the commands by their path from any folder (`../android-wsl-dev-tools/bin/touch.sh`), or
-   put them on your `PATH`.
+3. Call the commands by their path from any folder (`../android-wsl-dev-tools/bin/mobile-touch.sh`),
+   or put them on your `PATH`.
 
 ### Optional: put the commands on your `PATH`
 
-To type `start-emulator.sh` instead of its path, either add `bin/` to your `PATH` (in `~/.bashrc`):
+To type `mobile-start-emulator.sh` instead of its path, either add `bin/` to your `PATH` (in
+`~/.bashrc`):
 
 ```bash
 export PATH="$PATH:$HOME/android-wsl-dev-tools/bin"
@@ -69,8 +71,9 @@ Releases are git tags named `vMAJOR.MINOR.PATCH` ([semantic versioning](https://
 release notes on GitHub. `main` can change at any time, so anything automated should pin a release
 tag, or a full commit SHA.
 
-The version covers the commands' names, options and defaults as their `--help` shows them
-(including the AVD `create-avd.sh` creates), where they look for the SDK and AVDs, the environment
-variables they read, their exit statuses, and `start-emulator.sh`'s stdout (the serial alone).
-Breaking any of these is a new major version; new options or tested API levels are a new minor one.
-Messages, [`lib/`](lib/README.md) and [`tests/`](tests/README.md) can change in any release.
+The version covers the commands' names, options and defaults as their `--help` shows them (including
+the AVD `mobile-create-avd.sh` creates), where they look for the SDK and AVDs, the environment
+variables they read, their exit statuses, and `mobile-start-emulator.sh`'s stdout (the serial
+alone). Breaking any of these is a new major version; new options or tested API levels are a new
+minor one. Messages, [`lib/`](lib/README.md) and [`tests/`](tests/README.md) can change in any
+release.

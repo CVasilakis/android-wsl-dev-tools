@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Creates a phone or tablet emulator for developing and testing Android apps.
 #
-# Usage:   create-avd.sh [avd-name]              (default: $AWDT_AVD, else phone_api36)
-#          create-avd.sh --api 30 [avd-name]     (default: phone_api30)
-#          create-avd.sh --tablet --api 34       (default: tablet_api34)
-#          create-avd.sh --google-apis --api 34  (with Google's apps; default: phone_gapi34)
-#          create-avd.sh --device pixel_9_pro_fold --api 36   (any profile of `avdmanager list device`)
-#          create-avd.sh --size 720x1280 --density 320 small_phone   (another screen)
-#          create-avd.sh --if-missing [...]      (an existing AVD of that image is fine: CI caches)
-#          create-avd.sh --help
+# Usage:   mobile-create-avd.sh [avd-name]              (default: $AWDT_AVD, else phone_api36)
+#          mobile-create-avd.sh --api 30 [avd-name]     (default: phone_api30)
+#          mobile-create-avd.sh --tablet --api 34       (default: tablet_api34)
+#          mobile-create-avd.sh --google-apis --api 34  (with Google's apps; default: phone_gapi34)
+#          mobile-create-avd.sh --device pixel_9_pro_fold --api 36   (any profile of `avdmanager list device`)
+#          mobile-create-avd.sh --size 720x1280 --density 320 small_phone   (another screen)
+#          mobile-create-avd.sh --if-missing [...]      (an existing AVD of that image is fine: CI caches)
+#          mobile-create-avd.sh --help
 # Result:  <avd-name>.avd and <avd-name>.ini in the folder the emulator looks for AVDs in
 #          ($ANDROID_AVD_HOME if set, ~/.android/avd by default)
 #
@@ -40,8 +40,8 @@ set -euo pipefail
 
 usage() {
     cat <<'EOF'
-Usage: create-avd.sh [--api <level>] [--google-apis] [--tablet] [--device <profile>]
-                     [--size <W>x<H>] [--density <dpi>] [--if-missing] [avd-name]
+Usage: mobile-create-avd.sh [--api <level>] [--google-apis] [--tablet] [--device <profile>]
+                            [--size <W>x<H>] [--density <dpi>] [--if-missing] [avd-name]
 
 Creates a phone or tablet emulator (AVD) for developing Android apps: a multi-touch screen, and
 the PC's keyboard as a hardware keyboard. Never overwrites an existing AVD.
@@ -205,7 +205,7 @@ set_prop hw.ramSize 2048                  # enough for a test app; more starves 
 set_prop hw.cpu.ncore 4
 set_prop disk.dataPartition.size 4G       # the image's default userdata can be too small for many test apps
 set_prop hw.gpu.enabled yes
-set_prop hw.gpu.mode "$GPU_MODE"            # see sdk.sh; start-emulator.sh passes -gpu too, unless you pass your own
+set_prop hw.gpu.mode "$GPU_MODE"     # see sdk.sh; mobile-start-emulator.sh passes -gpu too, unless you pass your own
 set_prop showDeviceFrame no               # no device skin around the screen
 set_prop hw.audioInput no                 # no microphone needed
 # --size/--density replace the device profile's screen. No skin is set, so the emulator window
@@ -216,4 +216,4 @@ if [ -n "$WIDTH" ]; then
 fi
 if [ -n "$DENSITY" ]; then set_prop hw.lcd.density "$DENSITY"; fi
 
-echo "Created AVD '$AVD_NAME' in $AVD_DIR. Start it with: $(command_for start-emulator.sh) $AVD_NAME"
+echo "Created AVD '$AVD_NAME' in $AVD_DIR. Start it with: $(command_for mobile-start-emulator.sh) $AVD_NAME"

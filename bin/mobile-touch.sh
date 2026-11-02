@@ -2,7 +2,7 @@
 # Touches the screen of an emulator or device from the terminal or a script: taps, long presses,
 # swipes, drags, and two-finger pinches and rotations, the same on every API level.
 #
-# Usage:   touch.sh [-s <serial>] <gesture> <arguments>     (touch.sh --help lists them)
+# Usage:   mobile-touch.sh [-s <serial>] <gesture> <arguments>     (mobile-touch.sh --help lists them)
 # Target:  the serial given, else $ANDROID_SERIAL, else the only running emulator. Phones connected
 #          at the same time are only used when named, so a gesture never goes to one by accident.
 #
@@ -18,13 +18,13 @@
 # front of the app gets them instead.
 #
 # Troubleshooting:
-#   "several emulators are running"  -> name one: touch.sh -s emulator-5554 ...
+#   "several emulators are running"  -> name one: mobile-touch.sh -s emulator-5554 ...
 #   "the gesture failed"             -> the program's output follows; the device may be busy or gone
 set -uo pipefail
 
 usage() {
     cat <<'EOF'
-Usage: touch.sh [-s <serial>] <gesture> <arguments>
+Usage: mobile-touch.sh [-s <serial>] <gesture> <arguments>
 
 Touches the screen of an emulator or device, the same on every API level. Coordinates are pixels
 of the screen as it's turned now, or percentages of it (50%), which fit any screen.
@@ -143,7 +143,7 @@ CLASSPATH=$device_dex app_process /system/bin Gesture $*; else echo not-pushed; 
             "CLASSPATH=$device_dex app_process /system/bin Gesture $*" < /dev/null 2>&1)"
     fi
     if ! grep -q "Events injected: [1-9]" <<<"$output"; then
-        echo "touch.sh: the gesture failed on $SERIAL:" >&2
+        echo "mobile-touch.sh: the gesture failed on $SERIAL:" >&2
         tr -d '\r' <<<"${output:-adb gave no answer}" | grep -v '^[[:space:]]*$' | tail -n 5 >&2
         exit 1
     fi

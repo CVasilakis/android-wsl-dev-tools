@@ -1,4 +1,4 @@
-"""start-emulator.sh: choosing the AVD, booting it, finding its serial and reporting problems."""
+"""mobile-start-emulator.sh: choosing the AVD, booting it, finding its serial and reporting problems."""
 import os
 import subprocess
 import time
@@ -18,7 +18,7 @@ class EmulatorTestCase(ScriptTestCase):
         self.sandbox.install_sdk()
 
     def start(self, *args, env=None):
-        return self.sandbox.run("start-emulator.sh", *args, env=env)
+        return self.sandbox.run("mobile-start-emulator.sh", *args, env=env)
 
     def start_in_background(self, *args, env=None):
         """Starts the script as start() does, but returns its process at once, for a test that
@@ -26,7 +26,7 @@ class EmulatorTestCase(ScriptTestCase):
         end of the test."""
         self.stdout, self.stderr = self.sandbox.root / "stdout", self.sandbox.root / "stderr"
         with open(self.stdout, "w") as out, open(self.stderr, "w") as err:
-            script = subprocess.Popen([str(self.sandbox.tools / "bin" / "start-emulator.sh"), *args],
+            script = subprocess.Popen([str(self.sandbox.tools / "bin" / "mobile-start-emulator.sh"), *args],
                                       stdin=subprocess.DEVNULL, stdout=out, stderr=err,
                                       env=self.sandbox.env(**(env or {})), cwd=self.sandbox.project)
         self.addCleanup(script.wait)
@@ -92,7 +92,7 @@ class ChoosesTheAvd(EmulatorTestCase):
 
     def test_an_avd_as_create_avd_leaves_it_counts(self):
         # Without the spaces the emulator writes around "=".
-        self.assertSucceeded(self.sandbox.run("create-avd.sh", "my_phone"))
+        self.assertSucceeded(self.sandbox.run("mobile-create-avd.sh", "my_phone"))
         self.assertEqual(self.booted_avd(self.start()), "my_phone")
 
     def test_only_tv_avds_is_no_choice(self):
@@ -140,9 +140,9 @@ class ChoosesTheAvd(EmulatorTestCase):
         self.assertIn("AVDs found: phone_api36", result.output)
 
     def test_no_avds_suggests_creating_one(self):
-        result = self.sandbox.run("start-emulator.sh", how="relative")
+        result = self.sandbox.run("mobile-start-emulator.sh", how="relative")
         self.assertFailed(result, "AVDs found: none")
-        self.assertIn("create one with\n../tools/bin/create-avd.sh", result.output)
+        self.assertIn("create one with\n../tools/bin/mobile-create-avd.sh", result.output)
 
     def test_avds_in_a_custom_avd_home(self):
         home = self.sandbox.root / "avds"
@@ -256,7 +256,7 @@ class ColdOrQuickBoot(EmulatorTestCase):
         # more on a busy machine.
         result = self.start("--quick", env=self.FAST)
         self.assertFailed(result, "adb can't reach it")
-        self.assertIn("stop-emulator.sh emulator-5554 && ", result.output)
+        self.assertIn("mobile-stop-emulator.sh emulator-5554 && ", result.output)
         self.assertIn("without --quick", result.output)
         self.assertEqual(len(self.reconnects()), 1, "reconnects once, then gives up")
 
@@ -288,7 +288,7 @@ class BootTimeout(EmulatorTestCase):
         self.assertFailed(result, "didn't finish booting within 2 s")
         self.assertIn("Android emulator version", result.output, "the log's last lines are shown")
         self.assertIn("AWDT_BOOT_TIMEOUT", result.output)
-        self.assertIn("start-emulator.sh phone_api36 -wipe-data", result.output)
+        self.assertIn("mobile-start-emulator.sh phone_api36 -wipe-data", result.output)
         self.assertEqual(self.sandbox.running(), {}, "the half-booted emulator is stopped")
         # What the output can't show: a hung adb call ended after AWDT_ADB_TIMEOUT, not 15 s.
         self.assertLess(time.monotonic() - started, 15)
@@ -687,7 +687,7 @@ class WaitsForHome(EmulatorTestCase):
 
 
 class PrintsTheSerial(EmulatorTestCase):
-    """stdout holds the serial and nothing else, so serial="$(start-emulator.sh)" works; every
+    """stdout holds the serial and nothing else, so serial="$(mobile-start-emulator.sh)" works; every
     message goes to stderr."""
 
     def setUp(self):
@@ -716,7 +716,7 @@ class PrintsTheSerial(EmulatorTestCase):
         self.assertSucceeded(result)
         self.assertEqual(result.out, "emulator-5556\n")
         self.assertIn("export ANDROID_SERIAL=emulator-5556", result.err)
-        self.assertIn("wslg-toolbar: toolbar hidden", result.err)
+        self.assertIn("mobile-wslg-toolbar: toolbar hidden", result.err)
 
     def test_with_quick_after_a_reconnect(self):
         self.sandbox.set_behavior(adb_offline="until_reconnect")
@@ -879,9 +879,9 @@ class Kvm(EmulatorTestCase):
     def test_the_sg_rerun_finds_the_script_when_called_through_a_symlink(self):
         self.sandbox.kvm.chmod(0o444)
         self.sandbox.set_behavior(kvm_group_members=["tester"])
-        self.sandbox.run("start-emulator.sh", how="symlink")
+        self.sandbox.run("mobile-start-emulator.sh", how="symlink")
         [argv] = self.sandbox.argvs("sg")
-        self.assertIn(f"{self.sandbox.tools}/bin/start-emulator.sh phone_api36", argv[2],
+        self.assertIn(f"{self.sandbox.tools}/bin/mobile-start-emulator.sh phone_api36", argv[2],
                       "sg's shell may not have the same $PATH, so the real path is used")
 
 
@@ -891,7 +891,7 @@ class WslToolbar(EmulatorTestCase):
         self.sandbox.add_avd("phone_api36")
 
     def toolbar_calls(self):
-        return [argv for argv in self.sandbox.argvs("python3") if argv[0].endswith("wslg-toolbar.py")]
+        return [argv for argv in self.sandbox.argvs("python3") if argv[0].endswith("mobile-wslg-toolbar.py")]
 
     def test_hidden_after_boot_on_wsl(self):
         self.sandbox.wsl()
@@ -900,9 +900,9 @@ class WslToolbar(EmulatorTestCase):
 
     def test_toolbar_script_found_when_called_through_a_symlink(self):
         self.sandbox.wsl()
-        self.assertSucceeded(self.sandbox.run("start-emulator.sh", how="symlink"))
+        self.assertSucceeded(self.sandbox.run("mobile-start-emulator.sh", how="symlink"))
         [argv] = self.toolbar_calls()
-        self.assertEqual(argv[0], str(self.sandbox.tools / "bin" / "wslg-toolbar.py"))
+        self.assertEqual(argv[0], str(self.sandbox.tools / "bin" / "mobile-wslg-toolbar.py"))
 
     def test_emulator_toolbar_show(self):
         self.sandbox.wsl()

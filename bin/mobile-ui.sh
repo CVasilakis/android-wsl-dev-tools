@@ -2,24 +2,24 @@
 # Sees what's on the screen of an emulator or device, and acts on it by what it says rather than by
 # coordinates, so that a script or an agent can drive an app the way a person reads one.
 #
-# Usage:   ui.sh [-s <serial>] <command> <arguments>     (ui.sh --help lists them)
-# Target:  as touch.sh: the serial given, else $ANDROID_SERIAL, else the only running emulator.
+# Usage:   mobile-ui.sh [-s <serial>] <command> <arguments>     (mobile-ui.sh --help lists them)
+# Target:  as mobile-touch.sh: the serial given, else $ANDROID_SERIAL, else the only running emulator.
 #
 # It reads the screen with `uiautomator dump` (lib/ui_tree.py reads what that writes) and leaves
-# gestures to touch.sh. `uiautomator dump` answers only once the screen has been idle for a moment,
+# gestures to mobile-touch.sh. `uiautomator dump` answers only once the screen has been idle for a moment,
 # so on an animating screen it fails with "could not get idle state": each look tries again, for up
 # to $AWDT_UI_TIMEOUT seconds. What uiautomator can't see: the inside of a WebView that doesn't
-# publish its content, a game's canvas, a secure window. A screenshot (ui.sh shot) shows those.
+# publish its content, a game's canvas, a secure window. A screenshot (mobile-ui.sh shot) shows those.
 #
 # Troubleshooting:
-#   "no element matches"              -> ui.sh list shows what's there; the screen may have moved on
+#   "no element matches"              -> mobile-ui.sh list shows what's there; the screen may have moved on
 #   "couldn't read the screen"        -> the screen keeps animating, or the device is gone
-#   "several emulators are running"   -> name one: ui.sh -s emulator-5554 ...
+#   "several emulators are running"   -> name one: mobile-ui.sh -s emulator-5554 ...
 set -uo pipefail
 
 usage() {
     cat <<'EOF'
-Usage: ui.sh [-s <serial>] <command> <arguments>
+Usage: mobile-ui.sh [-s <serial>] <command> <arguments>
 
 Sees what's on the screen of an emulator or device, and acts on it by what it says.
 
@@ -122,13 +122,13 @@ wait_for() {
     done
 }
 
-# touch_element <gesture> <selector>: the gesture, by touch.sh, on that element.
+# touch_element <gesture> <selector>: the gesture, by mobile-touch.sh, on that element.
 touch_element() {
     local place x y
     look_or_die
-    place="$(locate "$2")" || die "no element matches '$2' on $SERIAL. See what's there: $(command_for ui.sh) list"
+    place="$(locate "$2")" || die "no element matches '$2' on $SERIAL. See what's there: $(command_for mobile-ui.sh) list"
     read -r x y <<< "$place"
-    "$BIN_DIR/touch.sh" -s "$SERIAL" "$1" "$x" "$y"
+    "$BIN_DIR/mobile-touch.sh" -s "$SERIAL" "$1" "$x" "$y"
 }
 
 # type_text <text>: `adb shell input text`, which takes %s for a space. The text goes through the
@@ -136,7 +136,7 @@ touch_element() {
 type_text() {
     local text="$1" quoted
     if LC_ALL=C grep -q '[^ -~]' <<< "$text"; then
-        die "ui.sh type sends ASCII only: \`input text\` drops anything else."
+        die "mobile-ui.sh type sends ASCII only: \`input text\` drops anything else."
     fi
     text="${text// /%s}"
     quoted="'${text//\'/\'\\\'\'}'"

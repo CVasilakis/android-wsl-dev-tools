@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # shellcheck disable=SC2034  # the variables set here are used by the scripts that source this file
-# Waiting for a booted device to settle on its home screen (start-emulator.sh --wait-for-home).
+# Waiting for a booted device to settle on its home screen (mobile-start-emulator.sh --wait-for-home).
 # Needs sdk.sh and device.sh.
 
 # wait_for_home <serial> <seconds> [<backs>]: waits until a device has settled after its boot, which
@@ -44,7 +44,7 @@
 # BACK_AFTER is how long another app's screen must keep the focus to be taken as stuck: one that's
 # only passing by while the device settles has left by then. AWDT_BACK_AFTER exists for the tests.
 # OTHER_APP_TIMEOUT (AWDT_OTHER_APP_TIMEOUT; 0: none, only <seconds>) is far longer than any such
-# passing screen (start-emulator.sh validates it).
+# passing screen (mobile-start-emulator.sh validates it).
 BACK_AFTER="${AWDT_BACK_AFTER:-10}"
 OTHER_APP_TIMEOUT="${AWDT_OTHER_APP_TIMEOUT:-60}"
 wait_for_home() {

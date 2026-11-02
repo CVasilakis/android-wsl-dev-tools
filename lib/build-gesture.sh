@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds Gesture.dex from Gesture.java: the program touch.sh runs on a device. Run it after changing
+# Builds Gesture.dex from Gesture.java: the program mobile-touch.sh runs on a device. Run it after changing
 # Gesture.java, and commit both. Needs a JDK's javac and, from the Android SDK (found as the other
 # scripts find it), build-tools' d8 and a platform's android.jar.
 set -euo pipefail

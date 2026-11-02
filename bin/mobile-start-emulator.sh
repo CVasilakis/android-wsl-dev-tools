@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # Boots a phone or tablet emulator and returns once Android has finished booting, so it can be
-# chained: start-emulator.sh && ./gradlew installDebug
+# chained: mobile-start-emulator.sh && ./gradlew installDebug
 #
-# Usage:   start-emulator.sh [--quick] [--wait-for-home] [avd-name] [extra emulator flags...]
-#            start-emulator.sh                       # the default AVD (see below), cold boot
-#            start-emulator.sh --quick               # boot from the Quick Boot snapshot instead
-#            start-emulator.sh --wait-for-home       # return once the home app has settled in front
-#            start-emulator.sh -wipe-data            # default AVD, factory reset
-#            start-emulator.sh my_phone -gpu host    # another AVD, hardware rendering
-#          EMULATOR_TOOLBAR=show start-emulator.sh   # keep a clickable side toolbar (WSL)
-#          start-emulator.sh --help
+# Usage:   mobile-start-emulator.sh [--quick] [--wait-for-home] [avd-name] [extra emulator flags...]
+#            mobile-start-emulator.sh                # the default AVD (see below), cold boot
+#            mobile-start-emulator.sh --quick        # boot from the Quick Boot snapshot instead
+#            mobile-start-emulator.sh --wait-for-home  # return once the home app has settled in front
+#            mobile-start-emulator.sh -wipe-data     # default AVD, factory reset
+#            mobile-start-emulator.sh my_phone -gpu host  # another AVD, hardware rendering
+#          EMULATOR_TOOLBAR=show mobile-start-emulator.sh  # keep a clickable side toolbar (WSL)
+#          mobile-start-emulator.sh --help
 # Which AVD: the name given, else $AWDT_AVD, else the default AVD (DEFAULT_AVD, lib/avd.sh) if it
 #          exists, else the only phone or tablet AVD. Anything else is an error that lists the AVDs.
 # Output:  the emulator's serial (e.g. emulator-5554), alone on stdout, so scripts can capture it:
-#          serial="$(start-emulator.sh)". Every message goes to stderr.
+#          serial="$(mobile-start-emulator.sh)". Every message goes to stderr.
 # Log:     ${TMPDIR:-/tmp}/emulator-<avd-name>.log  (look here first if the window never appears)
-# Stop:    stop-emulator.sh <avd-name|serial>   (returns once it has exited; the emulator saves
+# Stop:    mobile-stop-emulator.sh <avd-name|serial>   (returns once it has exited; the emulator saves
 #          a Quick Boot snapshot, which --quick boots from)
 #
 # Cold boot or Quick Boot: a cold boot (the default, -no-snapshot-load) starts Android from scratch
@@ -88,13 +88,13 @@ set -euo pipefail
 
 usage() {
     cat <<'EOF'
-Usage: start-emulator.sh [--quick] [--wait-for-home] [avd-name] [emulator flags...]
+Usage: mobile-start-emulator.sh [--quick] [--wait-for-home] [avd-name] [emulator flags...]
 
 Boots a phone or tablet emulator in the background and returns once Android is ready, so it can be
-chained: start-emulator.sh && ./gradlew installDebug. Cold boot by default.
+chained: mobile-start-emulator.sh && ./gradlew installDebug. Cold boot by default.
 
 Prints the emulator's serial (e.g. emulator-5554) on stdout and every message on stderr, so
-serial="$(start-emulator.sh)" captures it. Without $DISPLAY it adds -no-window.
+serial="$(mobile-start-emulator.sh)" captures it. Without $DISPLAY it adds -no-window.
 
   --quick         boot from the Quick Boot snapshot saved when the emulator was last stopped
                   (faster); if adb can't reach the restored emulator for 30 s, reconnect adb once,
@@ -126,7 +126,7 @@ Environment:
 
 If the AVD is already running, it isn't started again: the script waits until it has booted,
 then prints its serial. The emulator keeps running after this
-script exits; stop it with: stop-emulator.sh <avd-name|serial>
+script exits; stop it with: mobile-stop-emulator.sh <avd-name|serial>
 EOF
 }
 case "${1:-}" in
@@ -196,7 +196,7 @@ is_handheld_avd() {
         ! grep -Eq '^tag\.ids? *=.*(android-tv|google-tv|wear|automotive|desktop|xr)' "$dir/config.ini"
 }
 
-# Pick the AVD. $DEFAULT_AVD is what create-avd.sh makes; a collaborator's own phone AVD is used when
+# Pick the AVD. $DEFAULT_AVD is what mobile-create-avd.sh makes; a collaborator's own phone AVD is used when
 # it's the only one, so nobody has to rename theirs.
 mapfile -t AVDS < <(list_avds)
 [ -n "$AVD_NAME" ] || AVD_NAME="${AWDT_AVD:-}"
@@ -216,8 +216,8 @@ if [ -z "$AVD_NAME" ] || ! in_list "$AVD_NAME" "${AVDS[@]}"; then
     else problem="can't tell which AVD to use: no $DEFAULT_AVD and not exactly one phone or tablet AVD."; fi
     die "$problem
 AVDs found: ${AVDS[*]:-none}
-Pass a name ($(command_for start-emulator.sh) <avd-name>), set AWDT_AVD, or create one with
-$(command_for create-avd.sh)."
+Pass a name ($(command_for mobile-start-emulator.sh) <avd-name>), set AWDT_AVD, or create one with
+$(command_for mobile-create-avd.sh)."
 fi
 
 # KVM is mandatory for x86 images (without it the emulator exits with "x86 emulation currently
@@ -249,7 +249,7 @@ and to keep that across restarts:
     fi
     ME="$(id -un)"
     if [[ " $(id -nG "$ME" 2>/dev/null || true) " == *" kvm "* ]] && [ -z "${_IN_SG_KVM:-}" ]; then
-        exec sg kvm -c "_IN_SG_KVM=1 $(printf '%q ' "$BIN_DIR/start-emulator.sh" "$AVD_NAME" \
+        exec sg kvm -c "_IN_SG_KVM=1 $(printf '%q ' "$BIN_DIR/mobile-start-emulator.sh" "$AVD_NAME" \
             ${QUICK:+--quick} ${WAIT_FOR_HOME:+--wait-for-home} "$@")"
     fi
     die "No access to $KVM_DEVICE. Run: sudo usermod -aG kvm $ME"
@@ -357,7 +357,7 @@ check_timeout() {
     if [ -z "$STARTED_HERE" ]; then
         die "'$AVD_NAME' ($SERIAL) didn't finish booting within $BOOT_TIMEOUT s.
 It wasn't started by this script, so it's left running. Stop it with:
-  $(command_for stop-emulator.sh) $SERIAL
+  $(command_for mobile-stop-emulator.sh) $SERIAL
 On a slow host, set AWDT_BOOT_TIMEOUT to wait longer (0: no limit)."
     fi
     last_lines="$(tail -n 15 "$LOG")"
@@ -366,7 +366,7 @@ On a slow host, set AWDT_BOOT_TIMEOUT to wait longer (0: no limit)."
 of $LOG:
 $last_lines
 On a slow host, set AWDT_BOOT_TIMEOUT to wait longer (0: no limit). If it never boots, try a
-factory reset: $(command_for start-emulator.sh) $AVD_NAME -wipe-data"
+factory reset: $(command_for mobile-start-emulator.sh) $AVD_NAME -wipe-data"
 }
 
 # A boot can take minutes with nothing to show, which in a CI log looks like a hang (see the
@@ -413,7 +413,7 @@ check_offline() {
     fi
     die "'$AVD_NAME' ($SERIAL) was restored from its Quick Boot snapshot, but adb can't reach it
 (still offline after adb reconnect). Stop it and start it without --quick, for a cold boot:
-  $(command_for stop-emulator.sh) $SERIAL && $(command_for start-emulator.sh) $AVD_NAME"
+  $(command_for mobile-stop-emulator.sh) $SERIAL && $(command_for mobile-start-emulator.sh) $AVD_NAME"
 }
 
 # adbd answers long before the package manager is up, and installing at that point fails, so wait
@@ -498,11 +498,11 @@ fi
 
 # Under WSLg the side toolbar can't be clicked, and while it's shown it takes keyboard focus away
 # from the emulator screen (typed keys never reach Android). So it's hidden by default: see
-# wslg-toolbar.py. Skipped outside
+# mobile-wslg-toolbar.py. Skipped outside
 # WSL (not needed) and with -no-window (there's no toolbar). '|| true': a failure here must not
 # report the already-booted emulator as failed.
 if [ -n "$STARTED_HERE" ] && is_wsl && ! in_list -no-window "$@"; then
-    python3 "$BIN_DIR/wslg-toolbar.py" "$AVD_NAME" "${EMULATOR_TOOLBAR:-hide}" >&2 || true
+    python3 "$BIN_DIR/mobile-wslg-toolbar.py" "$AVD_NAME" "${EMULATOR_TOOLBAR:-hide}" >&2 || true
 fi
 
 # The only line on stdout (see the header).

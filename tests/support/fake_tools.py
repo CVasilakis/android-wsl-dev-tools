@@ -73,7 +73,7 @@ DEFAULT_BEHAVIOR = {
     "emulator_noise": True,       # emulator -list-avds prints a log line before the names
     "device_settings": {},        # secure settings a newly booted emulator starts with, e.g.
                                   # {"long_press_timeout": "400"}; unset ones read as "null"
-    "pending_package_write": None,  # from API 33 on (api_level), stop-emulator.sh waits for
+    "pending_package_write": None,  # from API 33 on (api_level), mobile-stop-emulator.sh waits for
                                   # Android's own write of the app states: seconds after the
                                   # first `adb shell logcat -b events` call until a
                                   # commit_sys_config_file event for package-user-0 shows; None:
@@ -140,7 +140,7 @@ DEFAULT_BEHAVIOR = {
     "kvm_group_gid": None,        # gid of the kvm group; None = the gid of $AWDT_KVM_DEVICE,
                                   # i.e. the device belongs to the kvm group
     "javac_error": None,          # javac prints this and exits 1
-    "python3_exit": 0,            # exit code of the fake python3 standing in for wslg-toolbar.py
+    "python3_exit": 0,     # exit code of the fake python3 standing in for mobile-wslg-toolbar.py
 }
 
 STATE = Path(os.environ["FAKE_STATE"])
@@ -600,7 +600,7 @@ def write_device_state(serial, state):
     (STATE / "device" / f"{serial}.json").write_text(json.dumps(state))
 
 
-# The command touch.sh runs on a device: the program, or first a test whether it's there. A device
+# The command mobile-touch.sh runs on a device: the program, or first a test whether it's there. A device
 # without it says otherwise: "otherwise" of the test, or the error of app_process.
 GESTURE = re.compile(r"(?:if \[ -f (?P<wanted>\S+) \]; then )?"
                      r"CLASSPATH=(?P<dex>\S+) app_process /system/bin Gesture (?P<args>.*?)"
@@ -850,7 +850,7 @@ def avdmanager(args):
 
 def getent(args):
     if args == ["group", "kvm"]:
-        # The gid decides whether the kvm group owns the device: start-emulator.sh compares it
+  # The gid decides whether the kvm group owns the device: mobile-start-emulator.sh compares it
         # with the device's own gid, and a mismatch means joining the group can't grant access.
         gid = behavior()["kvm_group_gid"]
         if gid is None:
@@ -906,11 +906,11 @@ def id_(args):
 
 
 def python3(args):
-    # ui_tree.py runs for real: it only reads a file, and ui.sh's behavior is what it finds there.
+  # ui_tree.py runs for real: it only reads a file, and mobile-ui.sh's behavior is what it finds there.
     if args[:1] and args[0].endswith("/ui_tree.py"):
         os.execv(sys.executable, [sys.executable, *args])
-    # Stands in for wslg-toolbar.py, which reports what it did on stdout.
-    print("wslg-toolbar: toolbar hidden")
+  # Stands in for mobile-wslg-toolbar.py, which reports what it did on stdout.
+    print("mobile-wslg-toolbar: toolbar hidden")
     sys.exit(behavior()["python3_exit"])
 
 

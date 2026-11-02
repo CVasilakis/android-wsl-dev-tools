@@ -35,6 +35,12 @@ class Conventions(unittest.TestCase):
                 self.assertTrue(script.read_text().startswith("#!/usr/bin/env "),
                                 "must start with #!/usr/bin/env bash|python3")
 
+    def test_every_command_starts_with_mobile(self):
+        # So that it can share $PATH with the Android TV tools, whose commands start with tv-.
+        for script in RUNNABLE:
+            with self.subTest(script.name):
+                self.assertTrue(script.name.startswith("mobile-"), "name it mobile-<what it does>")
+
     def test_only_runnable_scripts_are_in_bin(self):
         # Everything in bin/ becomes a command for users who put it on $PATH.
         for path in BIN.iterdir():
@@ -91,11 +97,11 @@ class Conventions(unittest.TestCase):
                                              "--wait-for-home", env=None)
 
     def test_the_emulator_tier_copies_the_scripts_current_time_limits(self):
-        # The tier's limits for start-emulator.sh and stop-emulator.sh are built from these values
+  # The tier's limits for mobile-start-emulator.sh and mobile-stop-emulator.sh are built from these values
         # of the scripts. With a value grown in a script only, Python could stop the script
         # halfway and leave its emulator running.
         device, start, stop = (path.read_text() for path in
-                               (LIB / "device.sh", BIN / "start-emulator.sh", BIN / "stop-emulator.sh"))
+                               (LIB / "device.sh", BIN / "mobile-start-emulator.sh", BIN / "mobile-stop-emulator.sh"))
         stop_emulator = re.search(r"^stop_emulator\(\) \{\n.*?^\}", start, re.M | re.S)
         scripts = {
             "ADB_TIMEOUT": (device, r'^ADB_TIMEOUT="\$\{AWDT_ADB_TIMEOUT:-(\d+)\}"'),

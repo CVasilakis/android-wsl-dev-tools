@@ -1,4 +1,4 @@
-"""Reads the screen as `uiautomator dump` wrote it, for ui.sh. Standard library only.
+"""Reads the screen as `uiautomator dump` wrote it, for mobile-ui.sh. Standard library only.
 
 Usage: ui_tree.py list <dump.xml>                 every element worth naming, one per line
        ui_tree.py find <dump.xml> <selector>      "<x> <y>" of the element's center, then a line

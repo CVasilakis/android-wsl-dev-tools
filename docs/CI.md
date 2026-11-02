@@ -25,8 +25,8 @@ cmdline-tools are older than 23.0 (12.0 on `ubuntu-24.04` at the time of writing
 records usage, and exits 0 for a package that doesn't exist, so a typo in the package list would
 no longer fail the step.
 
-The scripts need nothing else from the runner: without `$DISPLAY`, `start-emulator.sh` runs the
-emulator without a window by itself ([`EMULATORS.md`](EMULATORS.md#booting-one)).
+The scripts need nothing else from the runner: without `$DISPLAY`, `mobile-start-emulator.sh` runs
+the emulator without a window by itself ([`EMULATORS.md`](EMULATORS.md#booting-one)).
 
 ## Example workflow
 
@@ -76,8 +76,8 @@ jobs:
 
       - name: Boot the emulator
         run: |
-          create-avd.sh --api ${{ matrix.api }} --if-missing
-          serial="$(start-emulator.sh --wait-for-home phone_api${{ matrix.api }} -no-snapshot-save)"
+          mobile-create-avd.sh --api ${{ matrix.api }} --if-missing
+          serial="$(mobile-start-emulator.sh --wait-for-home phone_api${{ matrix.api }} -no-snapshot-save)"
           echo "ANDROID_SERIAL=$serial" >> "$GITHUB_ENV"
       - run: ./gradlew connectedDebugAndroidTest
 
@@ -92,9 +92,10 @@ Why the steps look like this:
 
 - **Pin a release** (`ref`), never `main`: see [Versions](../README.md#versions).
 - **`serial="$(…)"` on a line of its own.** As an assignment by itself, a failed boot fails the
-  step; inside `echo "…$(start-emulator.sh)" >> …` the step would carry on with an empty serial.
+  step; inside `echo "…$(mobile-start-emulator.sh)" >> …` the step would carry on with an empty
+  serial.
 - **`ANDROID_SERIAL`** makes adb and Gradle use that emulator in every later step.
-- **`--wait-for-home`** (from v1.5.0 on): `start-emulator.sh` returns once Android has booted
+- **`--wait-for-home`** (from v1.5.0 on): `mobile-start-emulator.sh` returns once Android has booted
   (`sys.boot_completed`), which on a runner comes before the device has settled, so the tests' first
   touches could reach no app. With `--wait-for-home` it also waits until the home screen is in
   front with the focus ([`EMULATORS.md`](EMULATORS.md#booting-one)).
@@ -116,10 +117,10 @@ Why the steps look like this:
 - **The log.** The emulator logs to `${TMPDIR:-/tmp}/emulator-<avd>.log`; the last step prints it
   when something failed.
 - **One emulator per job.** A matrix keeps each job small. Several emulators in one job work too:
-  boot each with its own `start-emulator.sh`, keep each serial, and pass it to adb with `-s`
+  boot each with its own `mobile-start-emulator.sh`, keep each serial, and pass it to adb with `-s`
   (Gradle's `connected…` tasks run on every booted emulator).
-- **Stopping.** Not needed: the runner stops what's left when the job ends. To stop it earlier,
-  e.g. before booting the next one in the same job: `stop-emulator.sh "$ANDROID_SERIAL"`, which
+- **Stopping.** Not needed: the runner stops what's left when the job ends. To stop it earlier, e.g.
+  before booting the next one in the same job: `mobile-stop-emulator.sh "$ANDROID_SERIAL"`, which
   returns once it has exited.
 
 ## Caching
@@ -128,10 +129,10 @@ The system image is the big download. To skip it on later runs, cache
 `$ANDROID_HOME/system-images/android-<level>` (for example with `actions/cache`), keyed on the
 level, and restore it before the `sdkmanager` step, which then finds it installed.
 
-Caching the AVD (`~/.android/avd`) saves little, since `create-avd.sh` is quick, and brings the
-previous run's data partition along: apps installed and settings changed by earlier tests. If you
-cache it anyway, `create-avd.sh --if-missing` keeps the cached AVD
-([`EMULATORS.md`](EMULATORS.md#creating-one)), and `start-emulator.sh … -wipe-data` starts it
+Caching the AVD (`~/.android/avd`) saves little, since `mobile-create-avd.sh` is quick, and brings
+the previous run's data partition along: apps installed and settings changed by earlier tests. If
+you cache it anyway, `mobile-create-avd.sh --if-missing` keeps the cached AVD
+([`EMULATORS.md`](EMULATORS.md#creating-one)), and `mobile-start-emulator.sh … -wipe-data` starts it
 from a clean data partition.
 
 This guide hasn't been run on GitHub yet: it's what works for the sibling Android TV tools, with

@@ -97,7 +97,7 @@ or point \$ANDROID_HOME at your SDK (see $TOOLS_DIR/docs/SETUP.md)."
 
 # How to call one of the scripts in bin/, for messages that suggest a command: its bare name when
 # that name on $PATH is this very script, else the way the running script was called (e.g.
-# ../android-wsl-dev-tools/bin/start-emulator.sh), so the suggestion can be pasted as is.
+# ../android-wsl-dev-tools/bin/mobile-start-emulator.sh), so the suggestion can be pasted as is.
 command_for() {
     local on_path
     on_path="$(command -v "$1" 2>/dev/null || true)"
@@ -117,6 +117,6 @@ is_wsl() { grep -qi microsoft "${AWDT_PROC_VERSION:-/proc/version}" 2>/dev/null;
 # JIT, which SELinux denies on Fedora. swiftshader_indirect is the usual choice elsewhere, but here
 # System UI misses its startup limit with it on API 36 and 37 ("failed to complete startup"), which
 # leaves an ANR dialog over the home screen on every cold boot, and it takes more memory
-# (docs/EMULATORS.md). create-avd.sh writes it into the AVD, start-emulator.sh passes it.
+# (docs/EMULATORS.md). mobile-create-avd.sh writes it into the AVD, mobile-start-emulator.sh passes it.
 GPU_MODE=swangle_indirect
 

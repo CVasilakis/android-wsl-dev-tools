@@ -1,4 +1,4 @@
-"""ui.sh and lib/ui_tree.py: reading the screen, finding elements on it, acting on them, waiting."""
+"""mobile-ui.sh and lib/ui_tree.py: reading the screen, finding elements on it, acting on them, waiting."""
 import os
 import signal
 import subprocess
@@ -38,7 +38,7 @@ class UiTestCase(ScriptTestCase):
         self.serial = self.sandbox.start_emulator("phone_api36")
 
     def ui(self, *args, env=None):
-        return self.sandbox.run("ui.sh", *args, env=env)
+        return self.sandbox.run("mobile-ui.sh", *args, env=env)
 
     def gestures(self, serial=None):
         return self.sandbox.device_state(serial or self.serial)["gestures"]
@@ -92,7 +92,7 @@ class Lists(UiTestCase):
     def test_takes_no_arguments(self):
         result = self.ui("list", "all")
         self.assertEqual(result.code, 2, result.output)
-        self.assertIn("Usage: ui.sh", result.err)
+        self.assertIn("Usage: mobile-ui.sh", result.err)
 
 
 class Selectors(UiTestCase):
@@ -264,14 +264,14 @@ class TouchesElements(UiTestCase):
             with self.subTest(command):
                 result = self.ui(command, "Nothing like it")
                 self.assertFailed(result, f"no element matches 'Nothing like it' on {self.serial}", code=1)
-                self.assertIn("ui.sh list", result.err)
+                self.assertIn("mobile-ui.sh list", result.err)
         self.assertEqual(self.gestures(), [])
 
     def test_says_how_to_call_list_the_way_it_was_called(self):
-        result = self.sandbox.run("ui.sh", "tap", "Nothing like it", how="path")
-        self.assertIn("See what's there: ui.sh list\n", result.err)
-        result = self.sandbox.run("ui.sh", "tap", "Nothing like it", how="relative")
-        self.assertIn("See what's there: ../tools/bin/ui.sh list\n", result.err)
+        result = self.sandbox.run("mobile-ui.sh", "tap", "Nothing like it", how="path")
+        self.assertIn("See what's there: mobile-ui.sh list\n", result.err)
+        result = self.sandbox.run("mobile-ui.sh", "tap", "Nothing like it", how="relative")
+        self.assertIn("See what's there: ../tools/bin/mobile-ui.sh list\n", result.err)
 
     def test_a_failed_gesture_fails_the_command(self):
         self.sandbox.set_behavior(gesture_output="Android refused event 0")
@@ -424,13 +424,13 @@ class Waits(UiTestCase):
             with self.subTest(value):
                 result = self.ui("wait", "Ready", value)
                 self.assertEqual(result.code, 2, result.output)
-                self.assertIn("Usage: ui.sh", result.err)
+                self.assertIn("Usage: mobile-ui.sh", result.err)
         self.assertEqual(self.dumps(), [])
 
     def test_without_a_limit_given_it_goes_on_looking(self):
         # Ended by the test: the default is too long to wait out here.
         self.sandbox.set_behavior(ui_hierarchy=[self.EMPTY])
-        script = subprocess.Popen([str(self.sandbox.tools / "bin" / "ui.sh"), "wait", "Ready"],
+        script = subprocess.Popen([str(self.sandbox.tools / "bin" / "mobile-ui.sh"), "wait", "Ready"],
                                   stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                   stderr=subprocess.DEVNULL, env=self.sandbox.env(),
                                   cwd=self.sandbox.project)
@@ -531,7 +531,7 @@ class Types(UiTestCase):
         for text in ("καλημέρα", "café", "emoji 🙂", "tab\there"):
             with self.subTest(text):
                 result = self.ui("-s", self.serial, "type", text)
-                self.assertFailed(result, "ui.sh type sends ASCII only", code=1)
+                self.assertFailed(result, "mobile-ui.sh type sends ASCII only", code=1)
         self.assertEqual(self.sandbox.argvs("adb"), [])
         self.assertEqual(self.sandbox.device_state(self.serial)["typed"], [])
 
@@ -547,7 +547,7 @@ class Types(UiTestCase):
 
 
 class WhichDevice(UiTestCase):
-    """As touch.sh: the serial given, $ANDROID_SERIAL, the only running emulator."""
+    """As mobile-touch.sh: the serial given, $ANDROID_SERIAL, the only running emulator."""
 
     def setUp(self):
         super().setUp()
@@ -597,7 +597,7 @@ class WrongArguments(UiTestCase):
     def assertRefused(self, *args):
         result = self.ui(*args)
         self.assertEqual(result.code, 2, result.output)
-        self.assertIn("Usage: ui.sh", result.err)
+        self.assertIn("Usage: mobile-ui.sh", result.err)
         self.assertEqual(self.sandbox.argvs("adb"), [], "adb must not be called")
 
     def test_no_command(self):
@@ -623,7 +623,7 @@ class WrongArguments(UiTestCase):
         self.assertRefused("-s", "emulator-5554")
 
     def test_nothing_else_is_needed_for_the_usage(self):
-        result = self.sandbox.run("ui.sh", "tap", env={"ANDROID_HOME": "/nonexistent"})
+        result = self.sandbox.run("mobile-ui.sh", "tap", env={"ANDROID_HOME": "/nonexistent"})
         self.assertEqual(result.code, 2, result.output)
 
     def test_help_goes_to_stdout(self):
@@ -631,7 +631,7 @@ class WrongArguments(UiTestCase):
             with self.subTest(flag):
                 result = self.ui(flag)
                 self.assertSucceeded(result)
-                self.assertIn("Usage: ui.sh", result.out)
+                self.assertIn("Usage: mobile-ui.sh", result.out)
                 self.assertEqual(result.err, "")
 
     def test_no_sdk(self):
@@ -676,7 +676,7 @@ class TemporaryFiles(UiTestCase):
 
     def test_after_being_stopped(self):
         self.sandbox.set_behavior(ui_hierarchy=[hierarchy(node(text="Loading"))])
-        script = subprocess.Popen([str(self.sandbox.tools / "bin" / "ui.sh"), "wait", "Ready"],
+        script = subprocess.Popen([str(self.sandbox.tools / "bin" / "mobile-ui.sh"), "wait", "Ready"],
                                   stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                   stderr=subprocess.DEVNULL, env=self.sandbox.env(),
                                   cwd=self.sandbox.project)

@@ -97,16 +97,17 @@ The Google APIs images (`system-images;android-<level>;google_apis;x86_64`; API 
 | 37 | 17 | ~2.1 GB | 5.3 GB |
 
 **Memory:** a running emulator takes 1.3–1.5 GB of RAM on API 21 to 25, about 1.9 GB on API 26 and
-27, and 2.4–3.1 GB from API 28 on; the Google APIs images take more, up to 4.7 GB. A host needs that much
-free beside what Gradle takes. Run one at a time on a small host, as a build next to an emulator can
-run out of memory.
+27, and 2.4–3.1 GB from API 28 on; the Google APIs images take more, up to 4.7 GB. A host needs that
+much free beside what Gradle takes. Run one at a time on a small host, as a build next to an
+emulator can run out of memory.
 
 ## Prerequisites
 
 - WSL2 with **WSLg** (Windows 11, or a recent Windows 10 build): `echo $DISPLAY` prints `:0`.
 - Hardware virtualization, so `/dev/kvm` exists: `ls -l /dev/kvm`. For WSL2 that's nested
   virtualization, enabled by default.
-- `unzip`, `curl` and `python3` 3.10+ (used by `wslg-toolbar.py`, `ui.sh` and the tests).
+- `unzip`, `curl` and `python3` 3.10+ (used by `mobile-wslg-toolbar.py`, `mobile-ui.sh` and the
+  tests).
 
 ## Steps
 
@@ -126,11 +127,11 @@ sudo usermod -aG kvm $USER
   need 21 or newer. A JDK only works with a Gradle that can run on it: 21 with Gradle 8.5 or
   newer, 25 with 9.1 or newer, so a project whose wrapper is still on 8.x fails on JDK 25 with
   `Unsupported class file major version 69`.
-- The `lib…` packages are the system libraries the emulator needs and doesn't bundle. Ubuntu's
-  WSL image lacks `libpulse0`, `libnss3`, `libxkbfile1` and `libsm6`; a more minimal Ubuntu, such
-  as a container, lacks the others too. Without one of them the emulator fails before showing
-  anything, even with `-no-audio`, e.g.
-  `qemu-system-i386: error while loading shared libraries: libnss3.so: cannot open shared object file`.
+- The `lib…` packages are the system libraries the emulator needs and doesn't bundle. Ubuntu's WSL
+  image lacks `libpulse0`, `libnss3`, `libxkbfile1` and `libsm6`; a more minimal Ubuntu, such as a
+  container, lacks the others too. Without one of them the emulator fails before showing anything,
+  even with `-no-audio`, e.g. `qemu-system-i386: error while loading shared libraries: libnss3.so:
+  cannot open shared object file`.
 - `sudo` needs a password, so run these in a regular terminal. Tools that run commands without a
   terminal (such as an AI agent's shell) can't prompt for it.
 
@@ -149,7 +150,7 @@ getent group kvm           # kvm:x:<gid>:<members>
 
 - **The gids match** and you're a member: you're done for new sessions. The new group only
   applies to sessions started after `usermod` (on WSL: after `wsl --shutdown` from Windows, then
-  reopening the terminal). `start-emulator.sh` also works in an already-open session by
+  reopening the terminal). `mobile-start-emulator.sh` also works in an already-open session by
   re-running itself with `sg kvm`.
 - **The gids differ**: the device belongs to a group that isn't `kvm`, so being in `kvm` grants
   nothing. This happens on WSL, where `/dev/kvm` is created before udev applies
@@ -166,15 +167,16 @@ getent group kvm           # kvm:x:<gid>:<members>
   in the other distro (with 993 being this distro's `kvm` gid, and free there):
   `sudo groupmod -g 993 kvm`.
 
-`start-emulator.sh` tells the two cases apart and prints the fix for the one you have.
+`mobile-start-emulator.sh` tells the two cases apart and prints the fix for the one you have.
 
 Check: `test -w /dev/kvm && echo ok` in a session started after `usermod` (or under `sg kvm`).
 
 ### 2. Command-line tools
 
-Download `commandlinetools-linux-*_latest.zip` from <https://developer.android.com/studio#command-tools>.
-The tools must live in `cmdline-tools/latest`, or they can't work out which SDK they belong to.
-Run this from the folder you downloaded the zip into:
+Download `commandlinetools-linux-*_latest.zip` from
+<https://developer.android.com/studio#command-tools>. The tools must live in `cmdline-tools/latest`,
+or they can't work out which SDK they belong to. Run this from the folder you downloaded the zip
+into:
 
 ```bash
 mkdir -p ~/Android/Sdk/cmdline-tools
@@ -337,14 +339,14 @@ android sdk install --no-metrics "system-images;android-36;google_apis;x86_64"  
 ### 6. Emulator (AVD)
 
 ```bash
-bin/create-avd.sh                       # creates the AVD "phone_api36"
-bin/create-avd.sh --api 30              # optional: "phone_api30", from the API 30 image of step 5
-bin/create-avd.sh --tablet --api 36     # optional: "tablet_api36"
+bin/mobile-create-avd.sh                # creates the AVD "phone_api36"
+bin/mobile-create-avd.sh --api 30       # optional: "phone_api30", from the API 30 image of step 5
+bin/mobile-create-avd.sh --tablet --api 36  # optional: "tablet_api36"
 ```
 
-avdmanager prints a devices.xml error that's harmless
-([`EMULATORS.md`](EMULATORS.md#creating-one)). `create-avd.sh` only writes files, so it works without
-KVM access; booting the AVD (step 7) is the first thing that needs it.
+avdmanager prints a devices.xml error that's harmless ([`EMULATORS.md`](EMULATORS.md#creating-one)).
+`mobile-create-avd.sh` only writes files, so it works without KVM access; booting the AVD (step 7)
+is the first thing that needs it.
 
 ### 7. Use it from a project
 
@@ -352,7 +354,7 @@ From the project's folder (here cloned next to this repository):
 
 ```bash
 ./gradlew assembleDebug                                 # the first run downloads Gradle, AGP, Kotlin and build-tools
-../android-wsl-dev-tools/bin/start-emulator.sh          # boots phone_api36, returns when Android is ready
+../android-wsl-dev-tools/bin/mobile-start-emulator.sh   # boots phone_api36, returns when Android is ready
 ./gradlew installDebug
 ```
 
