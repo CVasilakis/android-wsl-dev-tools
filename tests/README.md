@@ -28,7 +28,7 @@ too. The emulator tier isn't run there; run it locally before a release.
 | emulator | [`emulator/`](emulator) | Your SDK and AVD (`AWDT_AVD` picks one) | What fakes can't show: see [below](#the-emulator-tier). |
 
 Some hermetic tests skip, with the reason printed, when an optional tool is missing:
-- **Xvfb** (`sudo apt-get install -y xvfb`; Fedora: `sudo dnf install -y xorg-x11-server-Xvfb`) for
+- **Xvfb** (`sudo apt-get install -y xvfb`) for
   the `wslg-toolbar.py` tests, which create emulator-like windows on a private X server. It runs on
   the first free display from `:99` up, reachable only through an abstract socket: under WSLg
   `/tmp/.X11-unix` is read-only, and a low display number would capture the desktop's own apps. It
@@ -39,14 +39,45 @@ Some hermetic tests skip, with the reason printed, when an optional tool is miss
   small windows flash. Only use it to watch, with no Linux GUI app open that you'd mind losing:
   WSLg's compositor can crash during such a run, which closes every Linux GUI app and breaks the
   tests' X connections.
-- **shellcheck** (`sudo apt-get install -y shellcheck`; Fedora: `sudo dnf install -y ShellCheck`)
+- **shellcheck** (`sudo apt-get install -y shellcheck`)
   for static analysis of the shell scripts.
 
 ## The emulator tier
 
-It covers what only a real device shows: booting really completes, gestures reach an app,
-`ui.sh` reads and acts on a real screen, and stopping leaves the AVD ready to start again.
-`AWDT_TEST_EMULATOR_FLAGS` adds emulator flags to the boots it makes.
+It covers what only a real device shows, by what reaches an app: it installs
+[`emulator/TouchProbe.apk`](emulator/probe), which logs each touch it gets, what Android's own gesture
+detectors made of them, and how far two fingers moved; and removes it afterwards.
+
+- **Booting:** the boot completes, `--wait-for-home` returns with the home app in front, and no app
+  was reported as not responding meanwhile.
+- **Gestures:** each one lands where it was asked for and is recognized as what it is, percentages
+  included, on a screen as it's turned.
+- **The screen:** `ui.sh` lists, finds, taps, types, waits and takes screenshots on a real screen.
+- **The mouse:** the real emulator window on a private X server, with real pointer events (XTest,
+  which WSLg's own display ignores), so a click, a held button and a drag are checked as touches. That
+  covers everything from the X server on, not WSLg's own way to it, which needs a real mouse.
+- **Stopping:** `stop-emulator.sh` returns only once the AVD can start again, also for a `-read-only`
+  emulator, which writes no lock file, a frozen one, and one that's exiting already.
+
+The tier reuses the AVD if it's already running and leaves it running. Otherwise it boots it (cold)
+with `--wait-for-home -no-window -no-snapshot-save`, and stops it at the end. The tests that need the
+AVD to themselves skip when it was already running. `AWDT_TEST_EMULATOR_FLAGS` adds emulator flags to
+the boots it makes. It tests one AVD per run; to cover every [tested
+image](../docs/EMULATORS.md#tested-images), one emulator at a time:
+
+```bash
+for l in 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37; do
+    create-avd.sh --api $l --if-missing
+    AWDT_AVD=phone_api$l tests/run.py --emulator
+done
+```
+
+Its time limits hold for an emulator starved of CPU: a wait ends as soon as what it waits for is
+there, so a long limit only makes a failure slower. Its limits for `start-emulator.sh` and
+`stop-emulator.sh` are longer than the scripts' own, computed from them
+([`test_conventions.py`](hermetic/test_conventions.py) checks the copies): a script always gets to its
+own limit, stops what it started and says why, whereas Python stopping `start-emulator.sh` would leave
+its emulator booting. An emulator the tier boots is stopped at the end even when its boot failed.
 
 ## Layout
 
@@ -57,8 +88,8 @@ It covers what only a real device shows: booting really completes, gestures reac
 | [`support/fake_tools.py`](support/fake_tools.py) | Fakes for `adb`, `emulator`, `avdmanager`, `android`, `sdkmanager`, `python3`, `getent`, `id`, `sg`, `javac` and `d8`. |
 | [`support/screens.py`](support/screens.py) | Made-up screens as `uiautomator dump` writes them. |
 | [`support/front_look.py`](support/front_look.py) | `front_look`: `home_look` from [`../lib/home.sh`](../lib/home.sh) for another activity than the home app's. |
-| [`support/x11.py`](support/x11.py) | Private Xvfb server, fake emulator windows (the main window, the toolbar, and the hidden bar also titled "Emulator"; Xvfb has no window manager, so `raise_()` puts a window on top as one would when it maps it, and `set_wm_state()` and `set_frame_extents()` set `WM_STATE` and `_NET_FRAME_EXTENTS` as one would), and `WindowChurn`, a client that keeps opening and closing windows. |
-| [`emulator/`](emulator) | The real-emulator tier. |
+| [`support/x11.py`](support/x11.py) | Private Xvfb server, `Pointer` (real pointer events into a window, for the emulator tier), fake emulator windows (the main window, the toolbar, and the hidden bar also titled "Emulator"; Xvfb has no window manager, so `raise_()` puts a window on top as one would when it maps it, and `set_wm_state()` and `set_frame_extents()` set `WM_STATE` and `_NET_FRAME_EXTENTS` as one would), and `WindowChurn`, a client that keeps opening and closing windows. |
+| [`emulator/`](emulator) | The real-emulator tier, and [`probe/`](emulator/probe), the source of its app. |
 
 ## How the hermetic tier works
 
