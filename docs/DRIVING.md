@@ -17,8 +17,8 @@ devices connected, name one with `-s <serial>`, or set `ANDROID_SERIAL` to the s
 | Long press | Hold the button | `touch.sh long-press 540 1200` |
 | Swipe, fling | Drag; a quick one flings | `touch.sh swipe 200 1800 200 600`, with a short time for a fling: `… 80` |
 | Drag and drop | Hold, then drag | `touch.sh drag 300 500 800 1500` |
-| Pinch | Hold Ctrl and drag | `touch.sh pinch 540 1200 300 800` |
-| Rotate with two fingers | Hold Ctrl and drag round | `touch.sh rotate 540 1200 500 90` |
+| Pinch | | `touch.sh pinch 540 1200 300 800` |
+| Rotate with two fingers | | `touch.sh rotate 540 1200 500 90` |
 
 **In the window** the mouse is a finger on the emulator's own touchscreen, wherever the window is
 and whatever size it has: the emulator scales the screen to fit the display, and scales the
@@ -32,7 +32,7 @@ screenshot, whose scale may differ from the screen's.
 **How it works.** `touch.sh` plays each gesture with a small program of ours on the device
 ([`lib/Gesture.java`](../lib/Gesture.java)), one mechanism on every API level. `adb shell input`
 can't do this: each of its calls is a process of its own, too slow for a double tap; it has one
-finger; and on the oldest levels it can't hold a touch and then move it. The program stays in
+finger; and before API 26 it can't hold a touch and then move it. The program stays in
 `/data/local/tmp` after the first gesture, so later ones skip the push. Each gesture still starts a
 process on the device, so it can't follow another within a fraction of a second.
 
@@ -101,7 +101,23 @@ Esc and F1 don't reach Android: the emulator's window consumes them.
 
 ## Changing the device
 
-CHANGING-PLACEHOLDER
+| Change | Command | Where it was seen to work |
+|---|---|---|
+| Turn the screen | `adb shell settings put system accelerometer_rotation 0`, then `adb shell settings put system user_rotation 1` (`0`: back) | every tested level, as long as the app in front can turn: a phone's launcher doesn't |
+| Dark mode | `adb shell cmd uimode night yes` (`no`) | API 30 and 36; not on 21 or 24 |
+| Font size | `adb shell settings put system font_scale 1.3`; `… settings delete system font_scale` to undo | API 21, 24, 30 and 36 |
+| Screen size and density | `adb shell wm size 720x1280`, `adb shell wm density 320`; `… reset` to undo | every tested level |
+| Battery level | `adb shell dumpsys battery set level 15`; `adb shell dumpsys battery reset` to undo | API 21, 24, 30 and 36 |
+| Wi-Fi off | `adb shell svc wifi disable` (`enable`) | API 30 and 36 |
+| Mobile data off | `adb shell svc data disable` (`enable`) | accepted on API 21, 24, 30 and 36 |
+| Airplane mode | `adb shell cmd connectivity airplane-mode enable` (`disable`) | API 30 and 36; not on 21 or 24 |
+| Location | `adb emu geo fix <longitude> <latitude>` | accepted on API 21, 24, 30 and 36 |
+
+The images' `adbd` restarts as root on `adb root`, for what needs it.
+
+To check a second screen, as a `Presentation` shows on one, Android can draw one over the first:
+`adb shell settings put global overlay_display_devices 1280x720/240`, and `… delete global
+overlay_display_devices` to undo.
 
 ## Apps and logs
 
@@ -111,8 +127,10 @@ adb shell am start -n <package>/.<Activity>              # open an activity
 adb shell am force-stop <package>                        # close the app
 adb logcat -b crash                                      # crashes
 adb logcat -d -s <TAG>:I                                 # what a tag logged so far, then return
-adb logcat -c                                            # empty the log, before a step to watch
 adb exec-out screencap -p > screen.png                   # what ui.sh shot does
 ```
 
-`adb logcat` without `-d` never returns: a script must use `-d`, or a `timeout`.
+`adb logcat` without `-d` never returns: a script must use `-d`, or a `timeout`. Don't rely on
+`adb logcat -c` to start from an empty log: on API 21 and 30 it leaves lines behind. To watch one
+step, write a mark of your own, `adb shell log -t MyTag mark-1`, and read what comes after it. Pass
+`-v threadtime` when a script reads the lines: before API 23 the default format is another one.

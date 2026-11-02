@@ -77,7 +77,8 @@ one that doesn't answer. If it doesn't exit in time, it's killed. Never touches 
   --all            stop every running emulator
   --no-save        stop without having Android save first, for when its unsaved changes
                    don't matter: they're lost, and the stop skips the save's wait (from API 33
-                   on, all of AWDT_SAVE_WAIT when nothing is pending)
+                   on, all of AWDT_SAVE_WAIT when nothing is pending). Not on a new AVD's first
+                   boot: on API 23 its next boot would hang (docs/EMULATORS.md)
   -h, --help       show this help
 
 Environment:

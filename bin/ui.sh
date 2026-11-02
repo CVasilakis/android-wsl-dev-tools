@@ -148,9 +148,16 @@ case "$COMMAND" in
         look_or_die
         python3 "$LIB_DIR/ui_tree.py" list "$DUMP" ;;
     front)
-        # The last lines of each: after an ANR, the dump starts with a copy of the state then.
-        adb_bounded -s "$SERIAL" shell dumpsys window < /dev/null | tr -d '\r' \
-            | grep -E '^ *(mCurrentFocus|mFocusedApp)=' | sed 's/^ *//' | tail -n 2 ;;
+        # The last of each: after an ANR, the dump starts with a copy of the state then, and API 29
+        # names the focused app twice.
+        adb_bounded -s "$SERIAL" shell dumpsys window < /dev/null | tr -d '\r' | awk '
+            /^ *mCurrentFocus=/ { focus = $0 }
+            /^ *mFocusedApp=/ { app = $0 }
+            END {
+                sub(/^ */, "", focus); sub(/^ */, "", app)
+                if (focus != "") print focus
+                if (app != "") print app
+            }' ;;
     shot)
         adb_bounded -s "$SERIAL" exec-out screencap -p < /dev/null > "$1" \
             || die "couldn't take a screenshot of $SERIAL."

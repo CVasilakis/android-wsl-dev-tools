@@ -485,6 +485,18 @@ class Front(UiTestCase):
         self.assertEqual(result.out, "mCurrentFocus=Window{2 u0 new/new.Activity}\n"
                                      "mFocusedApp=ActivityRecord{2 u0 new/.Activity t2}\n")
 
+    def test_front_shows_one_line_of_each_where_a_dump_repeats_the_focused_app(self):
+        # API 29's dump names the focused app again, further down, as Token{...}.
+        window = ("  mCurrentFocus=Window{12ccf4c u0 app/app.Main}\n"
+                  "  mFocusedApp=AppWindowToken{7af9ca7 token=Token{3cc166 ActivityRecord{ae u0 app/.Main t19}}}\n"
+                  "    mFocusedApp=Token{3cc166 ActivityRecord{ae u0 app/.Main t19}}\n")
+        self.sandbox.set_behavior(front=[{"window": window, "activities": ""}])
+        result = self.ui("front")
+        self.assertSucceeded(result)
+        self.assertEqual(result.out.splitlines(), [
+            "mCurrentFocus=Window{12ccf4c u0 app/app.Main}",
+            "mFocusedApp=Token{3cc166 ActivityRecord{ae u0 app/.Main t19}}"])
+
     def test_takes_no_arguments(self):
         self.assertEqual(self.ui("front", "now").code, 2)
 

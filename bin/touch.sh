@@ -8,7 +8,7 @@
 #
 # Each gesture is played by a small program of ours on the device (lib/Gesture.java, built into
 # lib/Gesture.dex), as the shell user, through app_process, not by `adb shell input`: each `input`
-# call is a process of its own, too slow for a double tap; it has one finger; and before API 24 it
+# call is a process of its own, too slow for a double tap; it has one finger; and before API 26 it
 # can't hold a touch and then move it. The program goes to /data/local/tmp the first time, under a
 # name that holds its checksum, and stays there, so only the first gesture pays for the push; a
 # factory reset removes it.

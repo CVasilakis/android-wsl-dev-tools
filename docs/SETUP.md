@@ -31,7 +31,52 @@ The versions are the ones this setup was tested with; newer ones should work too
 
 ### Sizes
 
-SIZES-PLACEHOLDER
+Downloads are what goes over the network; "on disk" is what the finished install occupies.
+
+| Item | Download | On disk |
+|---|---|---|
+| cmdline-tools zip | ~174 MB | 175 MB (`cmdline-tools/`) |
+| JDK package (Ubuntu's) | ~83 MB | |
+| platform-tools | ~9 MB | 22 MB |
+| platforms;android-36 | ~66 MB | 146 MB |
+| build-tools (automatic, first build) | ~64 MB | 147 MB |
+| emulator | ~354 MB | 821 MB |
+| The API 36 system image | ~844 MB | 2.0 GB |
+| The emulator's system libraries (`libpulse0`, …, step 1) | a few MB | |
+| the `android` CLI, on its first run | ~250 MB | ~250 MB (`~/.android`) |
+| **The SDK once everything above is installed** | | **~3.3 GB** (`~/Android/Sdk`) |
+| Optional: the system images of other levels | table below | table below |
+| An AVD, once booted | | ~0.5 GB from API 28 on, 1.3 GB on API 24 to 27, 4.4 GB on API 21 to 23; it grows with snapshots and apps |
+| A Gradle distribution (first `./gradlew` of a project) | ~150 MB | |
+| Gradle/Maven dependencies of a project (AGP, Kotlin, test libraries, …) | a few hundred MB | ~1.3 GB (`~/.gradle`) |
+
+The plain images (`system-images;android-<level>;default;x86_64`):
+
+| API | Android | Download | On disk |
+|---|---|---|---|
+| 21 | 5.0 | ~293 MB | 3.2 GB |
+| 22 | 5.1 | ~300 MB | 3.3 GB |
+| 23 | 6.0 | ~365 MB | 3.6 GB |
+| 24 | 7.0 | ~419 MB | 3.1 GB |
+| 25 | 7.1 | ~423 MB | 3.3 GB |
+| 26 | 8.0 | ~474 MB | 3.2 GB |
+| 27 | 8.1 | ~492 MB | 3.2 GB |
+| 28 | 9 | ~565 MB | 2.7 GB |
+| 29 | 10 | ~690 MB | 3.2 GB |
+| 30 | 11 | ~676 MB | 3.2 GB |
+| 31 | 12 | ~657 MB | 4.2 GB |
+| 32 | 12L | ~668 MB | 4.2 GB |
+| 33 | 13 | ~694 MB | 4.2 GB |
+| 34 | 14 | ~721 MB | 1.7 GB |
+| 35 | 15 | ~782 MB | 1.7 GB |
+| 36 | 16 | ~844 MB | 2.0 GB |
+| 37 | 17 | ~908 MB | 2.5 GB |
+
+GOOGLE-SIZES-PLACEHOLDER
+
+**Memory:** a running emulator takes 1.3–1.5 GB of RAM on API 21 to 25, about 1.9 GB on API 26 and
+27, and 2.4–3.1 GB from API 28 on, so a host needs that much free beside what Gradle takes. Run one
+at a time on a small host, as a build next to an emulator can run out of memory.
 
 ## Prerequisites
 

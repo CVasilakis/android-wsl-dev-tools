@@ -40,6 +40,10 @@ EVENT_TIMEOUT = 60   # from a gesture's end until the app has logged it
 FOCUS_TIMEOUT = 60   # for an app's activity to come to the front
 TOUCH_LIMIT = 120    # for touch.sh or ui.sh to return: the limit of their adb calls, and more
 
+# How far from its end, in px, a moved touch may be released: Android resamples a moving touch for
+# the app, and the release can keep that position (5 px off on API 24).
+MOVED_MARGIN = 12
+
 # Python's limits for the scripts, from the scripts' own: when Python stops a script on the way,
 # its emulator can be left running (start-emulator.sh starts it with nohup), so a script must
 # always reach its own limits first, and clean up and say why. Each adb call they make gets
@@ -116,8 +120,9 @@ def start(avd, *flags, env=None):
 
 
 def stop(target, stop_timeout=STOP_TIMEOUT):
-    """Runs stop-emulator.sh --no-save: a test run's changes don't matter."""
-    return subprocess.run([str(BIN / "stop-emulator.sh"), "--no-save", target],
+    """Runs stop-emulator.sh. It saves, although a test run's changes don't matter: a new AVD's
+    first boot must be saved, or API 23's next boot hangs (docs/EMULATORS.md)."""
+    return subprocess.run([str(BIN / "stop-emulator.sh"), target],
                           capture_output=True, text=True, timeout=STOP_LIMIT,
                           env={**os.environ, "AWDT_STOP_TIMEOUT": str(stop_timeout)})
 
@@ -154,6 +159,7 @@ class Device:
     def __init__(self, serial):
         self.serial = serial
         self.env = {**os.environ, "ANDROID_SERIAL": serial}
+        self.mark = None
 
     def adb(self, *args, timeout=TOUCH_LIMIT):
         return subprocess.run([lib('echo "$ADB"'), "-s", self.serial, *args], capture_output=True,
@@ -195,12 +201,20 @@ class Device:
                 break
         else:
             raise AssertionError(f"the probe didn't come to the front:\n{focused}")
-        self.adb("logcat", "-c")
+        self.forget_log()
+
+    def forget_log(self):
+        """From now on log() starts here. By a line of our own in the log, as `logcat -c` leaves
+        lines behind on API 30."""
+        self.mark = f"mark {time.monotonic()}"
+        self.shell("log", "-p", "i", "-t", "AwdtProbe", shlex.quote(self.mark))
 
     def log(self):
-        output = self.adb("logcat", "-d", "-s", "AwdtProbe:I").stdout
-        return [line.split("AwdtProbe: ", 1)[1].strip() for line in output.splitlines()
-                if "AwdtProbe: " in line]
+        """What the probe logged since forget_log()."""
+        output = self.adb("logcat", "-d", "-v", "threadtime", "-s", "AwdtProbe:I").stdout
+        lines = [line.split("AwdtProbe: ", 1)[1].strip() for line in output.splitlines()
+                 if "AwdtProbe: " in line]
+        return lines[len(lines) - lines[::-1].index(self.mark):] if self.mark in lines else []
 
     def wait_for_log(self, pattern, why=""):
         """Waits until the probe has logged a line matching `pattern`; returns its match."""
@@ -286,9 +300,9 @@ class OnTheRealEmulator(unittest.TestCase):
 
     # --- Gestures -------------------------------------------------------------------------------
 
-    def assert_at(self, found, x, y):
-        self.assertLessEqual(abs(int(found.group(1)) - x), 2, found.group(0))
-        self.assertLessEqual(abs(int(found.group(2)) - y), 2, found.group(0))
+    def assert_at(self, found, x, y, margin=2):
+        self.assertLessEqual(abs(int(found.group(1)) - x), margin, found.group(0))
+        self.assertLessEqual(abs(int(found.group(2)) - y), margin, found.group(0))
 
     def played(self, *args):
         result = self.device.touch(*args)
@@ -324,7 +338,7 @@ class OnTheRealEmulator(unittest.TestCase):
         self.assert_at(self.device.wait_for_log(r"TOUCH ACTION_DOWN pointers=1 x=(\d+) y=(\d+)"),
                        x - 200, y)
         self.assert_at(self.device.wait_for_log(r"TOUCH ACTION_UP pointers=1 x=(\d+) y=(\d+)"),
-                       x + 200, y + 100)
+                       x + 200, y + 100, MOVED_MARGIN)
         self.assertGreater(len(self.device.touches("MOVE")), 5)
 
     def test_drag_holds_then_moves(self):
@@ -332,7 +346,7 @@ class OnTheRealEmulator(unittest.TestCase):
         self.played("drag", x - 200, y, x + 200, y + 200)
         self.device.wait_for_log(r"GESTURE LONG_PRESS")
         self.assert_at(self.device.wait_for_log(r"TOUCH ACTION_UP pointers=1 x=(\d+) y=(\d+)"),
-                       x + 200, y + 200)
+                       x + 200, y + 200, MOVED_MARGIN)
         log = self.device.log()
         pressed = next(i for i, line in enumerate(log) if "LONG_PRESS" in line)
         self.assertTrue(any("ACTION_MOVE" in line for line in log[pressed:]),
@@ -342,7 +356,7 @@ class OnTheRealEmulator(unittest.TestCase):
         x, y = self.device.area_center()
         for start_span, end_span in ((300, 800), (800, 300)):
             with self.subTest(frm=start_span, to=end_span):
-                self.device.adb("logcat", "-c")
+                self.device.forget_log()
                 self.played("pinch", x, y, start_span, end_span)
                 found = self.device.wait_for_log(r"SPAN from=(\d+) to=(\d+)")
                 self.assertLessEqual(abs(int(found.group(1)) - start_span), 2, found.group(0))
@@ -383,7 +397,7 @@ class OnTheRealEmulator(unittest.TestCase):
         width, height = map(int, lib(f"screen_size {device.serial}").split())
         self.assertGreater(width, height, "the screen didn't turn")
         self.device.ui("wait", "Probe button", 30)
-        self.device.adb("logcat", "-c")
+        self.device.forget_log()
         self.played("tap", "50%", "90%")
         self.assert_at(self.device.wait_for_log(r"GESTURE TAP x=(\d+) y=(\d+)"),
                        width // 2, height * 9 // 10)
@@ -481,7 +495,7 @@ class MouseOnTheEmulatorsWindow(unittest.TestCase):
                 pointer.hold(0.5, 0.75, 1.5)
                 device.wait_for_log(r"GESTURE LONG_PRESS", "for a held button")
 
-                device.adb("logcat", "-c")
+                device.forget_log()
                 pointer.drag(0.3, 0.8, 0.7, 0.6)
                 device.wait_for_log(r"GESTURE FLING", "for a drag")
             device.remove_probe()
