@@ -17,12 +17,15 @@ devices connected, name one with `-s <serial>`, or set `ANDROID_SERIAL` to the s
 | Long press | Hold the button | `mobile-touch.sh long-press 540 1200` |
 | Swipe, fling | Drag; a quick one flings | `mobile-touch.sh swipe 200 1800 200 600`, with a short time for a fling: `… 80` |
 | Drag and drop | Hold, then drag | `mobile-touch.sh drag 300 500 800 1500` |
-| Pinch | | `mobile-touch.sh pinch 540 1200 300 800` |
-| Rotate with two fingers | | `mobile-touch.sh rotate 540 1200 500 90` |
+| Pinch | Not under WSLg (below) | `mobile-touch.sh pinch 540 1200 300 800` |
+| Rotate with two fingers | Not under WSLg (below) | `mobile-touch.sh rotate 540 1200 500 90` |
 
 **In the window** the mouse is a finger on the emulator's own touchscreen, wherever the window is
 and whatever size it has: the emulator scales the screen to fit the display, and scales the
 pointer back.
+
+**Two fingers need `mobile-touch.sh` under WSLg.** Holding Ctrl over the window shows the emulator's
+two circles, but a drag then reaches Android as one finger.
 
 **Coordinates** are the screen's pixels as it's turned now, or percentages of it, which fit every
 screen: `mobile-touch.sh tap 50% 75%`. In a pinch or a rotation, a percentage of a distance is of
@@ -97,7 +100,8 @@ aren't text go through adb: `adb shell input keyevent ENTER`.
 | Menu | Ctrl+M | `adb shell input keyevent MENU` |
 | Volume | Ctrl+= and Ctrl+- | `adb shell input keyevent VOLUME_UP` (`VOLUME_DOWN`) |
 
-Esc and F1 don't reach Android: the emulator's window consumes them.
+Esc and F1 don't reach Android: the emulator's window consumes them. With a text field focused,
+Ctrl+= can also type a character into it.
 
 ## Changing the device
 
