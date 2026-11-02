@@ -18,6 +18,15 @@ LIBRARIES = [p for p in sorted(LIB.glob("*.sh")) if not p.read_text().startswith
 TIME_IS_UP = '[ "$2" -eq 0 ] || [ $((SECONDS - $1)) -gt "$2" ]'   # the one line that may compare it
 
 
+def anchors(document):
+    """The anchors of a Markdown file's headings, as GitHub makes them."""
+    found = set()
+    for heading in re.findall(r"^#+ +(.+)$", document.read_text(), re.M):
+        text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", heading).replace("`", "").lower()
+        found.add(re.sub(r"[^\w\- ]", "", text).replace(" ", "-"))
+    return found
+
+
 class Conventions(unittest.TestCase):
     def test_runnable_scripts_are_executable_with_a_shebang(self):
         for script in RUNNABLE:
@@ -103,6 +112,22 @@ class Conventions(unittest.TestCase):
                 self.assertEqual(getattr(tier, name), int(found.group(1)),
                                  f"tests/emulator/test_on_emulator.py's {name} differs from the "
                                  "script's")
+
+    def test_every_link_in_the_docs_leads_somewhere(self):
+        # The docs link instead of repeating (docs/README.md), so a broken link loses a fact.
+        documents = [path for path in TOOLS.rglob("*.md")
+                     if not {"tmp", ".git"} & set(path.relative_to(TOOLS).parts)]
+        self.assertGreater(len(documents), 5)
+        for document in documents:
+            for target in re.findall(r"\[[^\]]*\]\(([^)\s]+)\)", document.read_text()):
+                if re.match(r"[a-z]+:", target):
+                    continue
+                path, _, anchor = target.partition("#")
+                linked = (document.parent / path).resolve() if path else document
+                with self.subTest(f"{document.relative_to(TOOLS)}: {target}"):
+                    self.assertTrue(linked.exists(), "no such file")
+                    if anchor:
+                        self.assertIn(anchor, anchors(linked), "no such heading")
 
     def test_shell_syntax(self):
         for script in SHELL:

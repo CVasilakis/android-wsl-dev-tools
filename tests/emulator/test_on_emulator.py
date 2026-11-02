@@ -201,6 +201,11 @@ class Device:
                 break
         else:
             raise AssertionError(f"the probe didn't come to the front:\n{focused}")
+        # A window with the focus can still be coming: a touch then finds no window to go to, as on
+        # a phone (seen on Google APIs of API 36.1). uiautomator answers once the screen is idle.
+        shown = self.ui("wait", "id:probe_button", FOCUS_TIMEOUT)
+        if shown.returncode != 0:
+            raise AssertionError(f"the probe's screen didn't settle:\n{shown.stderr}")
         self.forget_log()
 
     def forget_log(self):
