@@ -72,11 +72,34 @@ The plain images (`system-images;android-<level>;default;x86_64`):
 | 36 | 16 | ~844 MB | 2.0 GB |
 | 37 | 17 | ~908 MB | 2.5 GB |
 
-GOOGLE-SIZES-PLACEHOLDER
+The Google APIs images (`system-images;android-<level>;google_apis;x86_64`; API 27's is `x86`, API
+37's folder `android-37.0`), with Google Play services and Google's apps:
+
+| API | Android | Download | On disk |
+|---|---|---|---|
+| 21 | 5.0 | ~0.4 GB | 3.5 GB |
+| 22 | 5.1 | ~0.6 GB | 3.5 GB |
+| 23 | 6.0 | ~0.7 GB | 3.6 GB |
+| 24 | 7.0 | ~1.1 GB | 3.1 GB |
+| 25 | 7.1 | ~1.3 GB | 3.6 GB |
+| 26 | 8.0 | ~1.0 GB | 3.2 GB |
+| 27 | 8.1 | ~0.8 GB | 3.2 GB |
+| 28 | 9 | ~1.1 GB | 2.7 GB |
+| 29 | 10 | ~1.3 GB | 3.2 GB |
+| 30 | 11 | ~1.4 GB | 3.3 GB |
+| 31 | 12 | ~1.5 GB | 4.3 GB |
+| 32 | 12L | ~1.5 GB | 4.3 GB |
+| 33 | 13 | ~1.7 GB | 8.2 GB |
+| 34 | 14 | ~1.6 GB | 4.2 GB |
+| 35 | 15 | ~1.7 GB | 3.5 GB |
+| 36 | 16 | ~1.9 GB | 4.3 GB |
+| 36.1 | 16 QPR | ~2.0 GB | 4.3 GB |
+| 37 | 17 | ~2.1 GB | 5.3 GB |
 
 **Memory:** a running emulator takes 1.3–1.5 GB of RAM on API 21 to 25, about 1.9 GB on API 26 and
-27, and 2.4–3.1 GB from API 28 on, so a host needs that much free beside what Gradle takes. Run one
-at a time on a small host, as a build next to an emulator can run out of memory.
+27, and 2.4–3.1 GB from API 28 on; the Google APIs images take more, up to 4.7 GB. A host needs that much
+free beside what Gradle takes. Run one at a time on a small host, as a build next to an emulator can
+run out of memory.
 
 ## Prerequisites
 

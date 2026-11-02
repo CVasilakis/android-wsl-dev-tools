@@ -393,14 +393,14 @@ class OnTheRealEmulator(unittest.TestCase):
                 else:
                     device.shell("settings", "put", "system", name, value)
         self.addCleanup(restore)
-        portrait = lib(f"screen_size {device.serial}")
+        before = lib(f"screen_size {device.serial}")
         device.shell("settings", "put", "system", "accelerometer_rotation", "0")
         device.shell("settings", "put", "system", "user_rotation", "1")
         deadline = time.monotonic() + FOCUS_TIMEOUT
-        while lib(f"screen_size {device.serial}") == portrait and time.monotonic() < deadline:
+        while lib(f"screen_size {device.serial}") == before and time.monotonic() < deadline:
             time.sleep(0.5)
         width, height = map(int, lib(f"screen_size {device.serial}").split())
-        self.assertGreater(width, height, "the screen didn't turn")
+        self.assertEqual(f"{height} {width}", before, "the screen didn't turn")
         self.device.ui("wait", "Probe button", 30)
         self.device.forget_log()
         self.played("tap", "50%", "90%")

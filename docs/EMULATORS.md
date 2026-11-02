@@ -5,7 +5,17 @@ first: [`SETUP.md`](SETUP.md). Using a running one: [`DRIVING.md`](DRIVING.md).
 
 ## Tested images
 
-TESTED-PLACEHOLDER
+The [emulator tier](../tests/README.md#the-emulator-tier) passes on each of these:
+
+- **Plain (AOSP) x86_64 images: API 21 to 37**, every level, as `phone_api<level>`.
+- **Google APIs images: API 21 to 37, and 36.1**, every level, x86_64 except API 27's, which is x86, as
+  `phone_gapi<level>`.
+- **Tablets:** `tablet_api30` and `tablet_api36`, from the plain images.
+
+A foldable (`pixel_9_pro_fold`, API 36) boots and lists its folded states, but the tier hasn't run on
+one. Untested: the
+Google Play images (`google_apis_playstore`), which have no root; the 16 KB page size images; and any
+level below 21.
 
 ## Creating one
 
@@ -152,10 +162,9 @@ like a hang in a CI log. Each adb call that checks the boot gets 15 s, because o
 that's half booted or short of CPU, adb can hang without answering; a call that runs out of time
 counts as "not booted yet", so the limit still applies.
 
-**Cold boot or Quick Boot.** By default Android starts from scratch (`-no-snapshot-load`); newer
-API levels take longer. `--quick` (anywhere on the command line) instead restores the snapshot the
-emulator saved when it was last stopped, which is faster (except on API 22, where restoring it
-is slower than a cold boot). A snapshot also restores `adbd`, the adb service inside Android, in
+**Cold boot or Quick Boot.** By default Android starts from scratch (`-no-snapshot-load`).
+`--quick` (anywhere on the command line) instead restores the snapshot the emulator saved when it
+was last stopped. A snapshot also restores `adbd`, the adb service inside Android, in
 the middle of its old connection, and sometimes adb then lists the
 emulator as `offline` and never gets through. So with `--quick`, if
 the emulator stays `offline` for 30 s, the script runs `adb reconnect offline`, and if it's still
@@ -215,7 +224,8 @@ deletes them when it exits; killed (SIGKILL), it leaves them there, to delete by
 
 `adb emu kill` stops the emulator without shutting Android
 down, and Android saves a change only a while after it's made, so a change made just before is
-lost: the next cold boot starts as if the command had never run. Measured on these emulators:
+lost: the next cold boot starts as if the command had never run. Measured on the same Android
+versions' TV images:
 
 | What | When it's safe from a kill |
 |---|---|
@@ -326,6 +336,9 @@ may run into:
 | Before 30 | `adb shell input` has no `motionevent`. `adb shell cmd uimode` doesn't work on the levels tried (21, 24). |
 | 21, 30 | `adb logcat -c` leaves lines behind. |
 | 36, 37 | Only `swiftshader_indirect` makes System UI miss its startup limit ([the renderer](#the-renderer)). |
+
+On the Google APIs images the launcher can differ (`com.google.android.apps.nexuslauncher` on recent
+levels). `start-emulator.sh --wait-for-home` asks Android which one it is, and names it.
 
 **The hang on API 23.** Each image runs a one-time setup activity (`com.android.sdksetup`) on a new
 AVD's first boot. When a stop throws away what that boot had yet to save, the next boot runs it
