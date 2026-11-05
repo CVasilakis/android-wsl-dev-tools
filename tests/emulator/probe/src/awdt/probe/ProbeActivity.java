@@ -2,6 +2,10 @@ package awdt.probe;
 
 import android.app.Activity;
 import android.content.Context;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -14,15 +18,43 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * What the emulator tier looks through at a real app: it logs what reaches it, under the tag
  * AwdtProbe. Its area logs each touch (TOUCH) and what Android's own detectors made of them
  * (GESTURE), and how far two fingers moved (SPAN, in px, and TURN, in degrees); its button logs
- * CLICK, its field TEXT.
+ * CLICK, its field TEXT. While it's in front, it listens to the motion sensors the device has
+ * (SENSORS, once) and logs each one's values whenever they change (SENSOR), as apps get them.
  */
 public class ProbeActivity extends Activity {
     private static final String TAG = "AwdtProbe";
+    @SuppressWarnings("deprecation")  // TYPE_ORIENTATION: the emulator still has one
+    private static final int[] SENSORS = {
+        Sensor.TYPE_ACCELEROMETER, Sensor.TYPE_GYROSCOPE, Sensor.TYPE_MAGNETIC_FIELD,
+        Sensor.TYPE_ORIENTATION,
+    };
+    private static final String[] SENSOR_NAMES = {
+        "ACCELEROMETER", "GYROSCOPE", "MAGNETIC_FIELD", "ORIENTATION",
+    };
+
+    private SensorManager sensorManager;
+    private final Map<Integer, String> lastValues = new HashMap<>();
+    private final SensorEventListener sensorLog = new SensorEventListener() {
+        @Override public void onSensorChanged(SensorEvent event) {
+            int type = event.sensor.getType();
+            String values = String.format(Locale.ROOT, "x=%.2f y=%.2f z=%.2f",
+                    event.values[0], event.values[1], event.values[2]);
+            if (values.equals(lastValues.put(type, values))) return;
+            for (int i = 0; i < SENSORS.length; i++) {
+                if (SENSORS[i] == type) Log.i(TAG, "SENSOR " + SENSOR_NAMES[i] + " " + values);
+            }
+        }
+
+        @Override public void onAccuracyChanged(Sensor sensor, int accuracy) { }
+    };
 
     @Override
     protected void onCreate(Bundle state) {
@@ -55,6 +87,28 @@ public class ProbeActivity extends Activity {
         column.addView(area, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         setContentView(column);
+        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        lastValues.clear();
+        StringBuilder listening = new StringBuilder("SENSORS");
+        for (int i = 0; i < SENSORS.length; i++) {
+            Sensor sensor = sensorManager.getDefaultSensor(SENSORS[i]);
+            if (sensor != null) {
+                sensorManager.registerListener(sensorLog, sensor, SensorManager.SENSOR_DELAY_GAME);
+                listening.append(' ').append(SENSOR_NAMES[i]);
+            }
+        }
+        Log.i(TAG, listening.toString());
+    }
+
+    @Override
+    protected void onPause() {
+        sensorManager.unregisterListener(sensorLog);
+        super.onPause();
     }
 
     private static final class Area extends View {

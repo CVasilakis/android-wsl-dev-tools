@@ -13,6 +13,7 @@ State directory ($FAKE_STATE):
   behavior.json           knobs set by the test, see DEFAULT_BEHAVIOR
   running/<serial>.json   a running fake emulator: {"avd", "pid", "polls", "offline", "hidden",
                           "stop_at", "stuck", "discoverable", "console_hung", "settings" (secure)}
+  running/<serial>.json also holds "sensors" ({name: [values]}) once the console set one
   device/<serial>.json    what's on a device, emulator or physical: {"files": {path: text}
                           (adb push, uiautomator dump), "gestures": [[argument, ...], ...] (what
                           the Gesture program was given), "typed": [text, ...] (input text)}
@@ -141,6 +142,10 @@ DEFAULT_BEHAVIOR = {
                                   # i.e. the device belongs to the kvm group
     "javac_error": None,          # javac prints this and exits 1
     "python3_exit": 0,     # exit code of the fake python3 standing in for mobile-wslg-toolbar.py
+    "sensors": {},                # an emulator's sensors where they differ from SENSORS, e.g.
+                                  # {"gyroscope": None} (disabled), {"acceleration": [0, 0, 9.81]}
+    "sensor_sets_refused_after": None,  # N: the console answers KO to every `sensor set` after
+                                  # the first N `adb emu` calls that set sensors
 }
 
 STATE = Path(os.environ["FAKE_STATE"])
@@ -697,6 +702,8 @@ def adb_emu(serial, info, args):
             sys.stdout.write("allows you to control (e.g. start/stop) the execution of the virtual "
                              "device\r\n\r\navailable sub-commands:\r\n    name             "
                              "query virtual device name\r\n\r\nKO:  bad sub-command\r\n")
+    elif " ".join(args).startswith("sensor"):
+        sensor_console(serial, info, " ".join(args))
     elif args == ["kill"]:
         hang_if("emu_kill")
         if behavior()["emulator_already_exiting"]:
@@ -719,6 +726,66 @@ def adb_emu(serial, info, args):
             os.kill(info["pid"], signal.SIGTERM)
     else:
         fail(f"fake adb: unsupported emu command {args}")
+
+
+# The sensors of a fresh emulator, in the console's order, with their values (None: disabled), as
+# the console of emulator 37.1 shows them on the plain images of API 21, 30 and 36.
+SENSORS = {
+    "acceleration": [0, 9.77631, 0.812349], "gyroscope": [0, 0, 0],
+    "magnetic-field": [0, 9.88766, -47.7452], "orientation": [-0.0829031, 0, 0],
+    "temperature": [0], "proximity": [1], "light": [0], "pressure": [1013.25], "humidity": [0],
+    "magnetic-field-uncalibrated": [0, 9.88766, -47.7452], "gyroscope-uncalibrated": [0, 0, 0],
+    "hinge-angle0": None, "hinge-angle1": None, "hinge-angle2": None, "heart-rate": None,
+    "rgbc-light": None, "wrist-tilt": None, "acceleration-uncalibrated": [0, 9.77631, 0.812349],
+    "heading": None,
+}
+# What the console reads of a value, as C's strtod: the number it starts with ("1,5" is 1).
+CONSOLE_NUMBER = re.compile(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?")
+
+
+def sensor_console(serial, info, text):
+    """`adb emu sensor ...`: every line one console command, each answered in turn with its own
+    OK or KO, as the real console does."""
+    sensors = {**SENSORS, **behavior()["sensors"]}
+    sensors.update(info.get("sensors", {}))
+    usage = {"get": 'KO: Usage: "get <sensorname>"',
+             "set": 'KO: Usage: "set <sensorname> <value-a>[:<value-b>[:<value-c>]]"'}
+    sets = any(line.split()[1:2] == ["set"] for line in text.splitlines() if line.strip())
+    refused_after = behavior()["sensor_sets_refused_after"]
+    refused = sets and refused_after is not None and not take("sensor_sets", refused_after)
+    out = []
+    for line in text.splitlines():
+        words = line.split()
+        if not words:
+            continue
+        if words == ["sensor", "status"]:
+            out += [f"{name}: {'disabled' if values is None else 'enabled'}."
+                    for name, values in sensors.items()] + ["OK"]
+            continue
+        if len(words) < 3 or words[1] not in usage:
+            out.append(f"KO: bad sub-command {line}")
+            continue
+        name = words[2]
+        if name not in sensors:
+            out.append(f"KO: unknown sensor name: {name}, run 'sensor status' to get available "
+                       "sensors.")
+        elif sensors[name] is None:
+            out.append(f"KO: '{name}' sensor is disabled.")
+        elif words[1] == "get":
+            out += [f"{name} = " + ":".join(f"{v:g}" for v in sensors[name]), "OK"]
+        elif len(words) != 4 or not all(CONSOLE_NUMBER.match(v) for v in words[3].split(":")):
+            out.append(usage["set"])
+        elif refused:
+            out.append("KO: the fake console refuses sensor sets now")
+        else:
+            given = [float(CONSOLE_NUMBER.match(v).group()) for v in words[3].split(":")]
+            values = list(sensors[name])
+            values[:len(given)] = given[:len(values)]
+            sensors[name] = values
+            info.setdefault("sensors", {})[name] = values
+            out.append("OK")
+    write_running(serial, info)
+    sys.stdout.write("".join(f"{line}\r\n" for line in out))
 
 
 # --- emulator -------------------------------------------------------------------------------

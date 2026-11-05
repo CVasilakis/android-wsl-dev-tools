@@ -45,7 +45,8 @@ Some hermetic tests skip, with the reason printed, when an optional tool is miss
 
 It covers what only a real device shows, by what reaches an app: it installs
 [`emulator/TouchProbe.apk`](emulator/probe), which logs each touch it gets, what Android's own
-gesture detectors made of them, and how far two fingers moved; and removes it afterwards.
+gesture detectors made of them, how far two fingers moved, and the motion sensors' values; and
+removes it afterwards.
 
 - **Booting:** the boot completes, `--wait-for-home` returns with the home app in front, and no app
   was reported as not responding meanwhile.
@@ -53,6 +54,9 @@ gesture detectors made of them, and how far two fingers moved; and removes it af
   included, on a screen as it's turned.
 - **The screen:** `mobile-ui.sh` lists, finds, taps, types, waits and takes screenshots on a real
   screen.
+- **Sensors:** `mobile-sensor.sh` sets a sensor and reads it back, and a tilt reaches the app in
+  Android's axes, step by step when it's smooth, the gyroscope turning on the way. Each test puts
+  the motion sensors back as it found them.
 - **The mouse:** the real emulator window on a private X server, with real pointer events (XTest,
   which WSLg's own display ignores), so a click, a held button and a drag are checked as touches.
   That covers everything from the X server on, not WSLg's own way to it, which needs a real mouse.
@@ -143,6 +147,7 @@ makes a script wait, an environment variable shortens the wait:
 | Android's own write of the app states | `api_level` 33 or more, `pending_package_write`, `earlier_package_write`, `sync_error` | `AWDT_SAVE_WAIT` |
 | A gesture | `gesture_output`, `push_error`, `screen_size`, `screen_turned`, `device_settings` | |
 | The screen | `ui_hierarchy`, `ui_idle_failures`, `screenshot` | `AWDT_UI_TIMEOUT` |
+| The emulator's sensors (its console) | `sensors`, `sensor_sets_refused_after` | `AWDT_SENSOR_STEP_MS` |
 
 Also arrange `connect_device()` (a physical device), `wsl()`, and file permissions on `sandbox.kvm`.
 Check the results with `result.code/out/err`, `sandbox.calls()`/`argvs(tool)` (each call has the

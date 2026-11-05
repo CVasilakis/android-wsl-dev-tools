@@ -11,6 +11,7 @@ What reaches an app is seen through TouchProbe.apk (probe/), installed for the t
 after them.
 """
 import getpass
+import math
 import os
 import re
 import shlex
@@ -406,6 +407,67 @@ class OnTheRealEmulator(unittest.TestCase):
         self.played("tap", "50%", "90%")
         self.assert_at(self.device.wait_for_log(r"GESTURE TAP x=(\d+) y=(\d+)"),
                        width // 2, height * 9 // 10)
+
+    # --- Sensors ------------------------------------------------------------------------------
+
+    def sensor(self, *args):
+        result = self.device.tool("mobile-sensor.sh", *args)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout
+
+    def keep_the_motion_sensors(self):
+        """Puts the motion sensors back as they were when the test ends."""
+        kept = [line.split() for line in self.sensor("status").splitlines()
+                if line.split()[0] in ("acceleration", "gyroscope", "magnetic-field", "orientation")
+                or line.split()[0].endswith("-uncalibrated")]
+        self.addCleanup(lambda: [self.device.tool("mobile-sensor.sh", "set", *line) for line in kept])
+
+    def accelerations(self):
+        """The accelerometer's values the probe got, in order."""
+        return [tuple(float(v) for v in found.groups()) for line in self.device.log()
+                if (found := re.match(r"SENSOR ACCELEROMETER x=(\S+) y=(\S+) z=(\S+)", line))]
+
+    def test_set_then_get_reads_it_back_and_reaches_an_app(self):
+        self.keep_the_motion_sensors()
+        self.sensor("set", "acceleration", "1.5", "-2", "9.5")
+        self.assertEqual(self.sensor("get", "acceleration"), "1.5 -2 9.5\n")
+        self.device.wait_for_log(r"SENSOR ACCELEROMETER x=1\.50 y=-2\.00 z=9\.50")
+
+    def test_status_lists_the_motion_sensors(self):
+        listed = [line.split()[0] for line in self.sensor("status").splitlines()]
+        for name in ("acceleration", "gyroscope", "magnetic-field", "orientation"):
+            self.assertIn(name, listed)
+
+    def test_tilt_reaches_an_app_in_androids_axes(self):
+        # x to the right of the screen, y up it, z out of it; gravity read as pointing up.
+        self.keep_the_motion_sensors()
+        for args, expected in ((["flat"], r"x=0\.00 y=0\.00 z=9\.81"),
+                               (["tilt", "30", "0"], r"x=0\.00 y=4\.91 z=8\.50"),
+                               (["tilt", "-20", "0"], r"x=0\.00 y=-3\.36 z=9\.22"),
+                               (["tilt", "0", "25"], r"x=-4\.15 y=0\.00 z=8\.89")):
+            with self.subTest(args):
+                self.sensor(*args)
+                self.device.wait_for_log(rf"SENSOR ACCELEROMETER {expected}", f"after {args}")
+
+    def test_a_smooth_tilt_reaches_an_app_step_by_step(self):
+        self.keep_the_motion_sensors()
+        self.sensor("flat")
+        self.device.wait_for_log(r"SENSOR ACCELEROMETER x=0\.00 y=0\.00 z=9\.81")
+        # Logged as the probe resumed, before the mark that log() starts from.
+        everything = self.device.adb("logcat", "-d", "-s", "AwdtProbe:I").stdout
+        listening = re.findall(r"SENSORS ?(.*)", everything)[-1].split()
+        self.device.forget_log()
+        # 3 s: on API 21 and 30 the emulator passes new values on every 0.8 s only.
+        self.sensor("tilt", "40", "0", "3000")
+        self.device.wait_for_log(r"SENSOR ACCELEROMETER x=0\.00 y=6\.31 z=7\.51")
+        rises = [y for x, y, z in self.accelerations()]
+        self.assertGreaterEqual(len(rises), 3, f"in steps: {rises}")
+        self.assertEqual(rises, sorted(rises), "one way only")
+        if "GYROSCOPE" in listening:
+            turns = [float(found.group(1)) for line in self.device.log()
+                     if (found := re.match(r"SENSOR GYROSCOPE x=(\S+) y=0\.00 z=0\.00", line))]
+            self.assertIn(round(math.radians(40) / 3, 2), turns, "turning on the way")
+            self.assertEqual(turns[-1], 0, "at rest at the end")
 
     # --- Seeing the screen ----------------------------------------------------------------------
 

@@ -6,9 +6,9 @@
 > say what the tools work with.
 
 Command-line tools for developing Android phone and tablet apps without Android Studio, on Ubuntu
-under WSL2: create, boot and stop emulators on every Android version, touch their screens, and see
-what's on them, from a terminal, a script or a coding agent. They work with any Gradle project, and
-find the SDK, AVDs and emulators on their own.
+under WSL2: create, boot and stop emulators on every Android version, touch their screens, tilt
+them, and see what's on them, from a terminal, a script or a coding agent. They work with any Gradle
+project, and find the SDK, AVDs and emulators on their own.
 
 The commands start with `mobile-`, as they cover phones and tablets. For Android TV, the same tools
 exist in [android-tv-wsl-dev-tools](https://github.com/CVasilakis/android-tv-wsl-dev-tools), whose
@@ -31,9 +31,9 @@ CI ([`docs/CI.md`](docs/CI.md)). macOS and native Windows aren't supported.
 apps are out of scope: their emulators need other hardware settings and input.
 
 **A physical phone** works with `mobile-touch.sh` and `mobile-ui.sh` once adb sees it, as they only
-talk to adb, but that's untested, and getting adb in WSL to a phone is up to you. Anything an
-emulator can't do needs one: see [what an emulator can't
-do](docs/EMULATORS.md#what-an-emulator-cant-do).
+talk to adb, but that's untested (`mobile-sensor.sh` needs an emulator: a phone's sensors are its
+own), and getting adb in WSL to a phone is up to you. Anything an emulator can't do needs one: see
+[what an emulator can't do](docs/EMULATORS.md#what-an-emulator-cant-do).
 
 **Tested emulator images:** in [`docs/EMULATORS.md`](docs/EMULATORS.md#tested-images).
 

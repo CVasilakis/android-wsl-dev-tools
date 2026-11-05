@@ -21,7 +21,7 @@ How the docs are written and kept up to date: [below](#writing-the-docs). Coding
 |---|---|
 | [`SETUP.md`](SETUP.md) | Installing the JDK, SDK and emulator on WSL2; sizes. |
 | [`EMULATORS.md`](EMULATORS.md) | Emulators: creating them, booting and stopping them, what each image does on its own. |
-| [`DRIVING.md`](DRIVING.md) | Using a running emulator: touch, keys, text, seeing what's on the screen, changing the device. |
+| [`DRIVING.md`](DRIVING.md) | Using a running emulator: touch, keys, text, seeing what's on the screen, sensors, changing the device. |
 | [`WSLG.md`](WSLG.md) | The emulator's window under WSLg: its side toolbar, and what doesn't work there. |
 | [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | From a symptom or a message to its cause. |
 | [`CI.md`](CI.md) | Using the tools in GitHub Actions. |

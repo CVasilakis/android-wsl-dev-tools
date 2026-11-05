@@ -64,7 +64,7 @@ the guides they link to explain the background.
 | `… It's still running.` | the emulator couldn't be stopped, or, without its PID, adb still listed it after `AWDT_STOP_TIMEOUT` seconds ([`EMULATORS.md`](EMULATORS.md#stopping-one)); kill its `qemu-system-…` process by the PID in the `pid_<PID>.ini` that `adb -s <serial> emu avd discoverypath` names, or reboot WSL (`wsl --shutdown` in Windows) |
 | `adb devices` shows `offline` or `unauthorized` | `adb reconnect offline`; if that doesn't help, `adb kill-server && adb start-server`; else stop the emulator and cold boot it |
 
-## Touch and the screen
+## Touch, the screen and the sensors
 
 | Symptom | Cause / fix |
 |---|---|
@@ -73,6 +73,10 @@ the guides they link to explain the background.
 | `several emulators are running` | name one with `-s <serial>`, or set `ANDROID_SERIAL` |
 | `adb: more than one device/emulator` | `export ANDROID_SERIAL=<serial>` (printed by `mobile-start-emulator.sh`) |
 | `mobile-ui.sh: couldn't read the screen of …` | the screen kept animating for `AWDT_UI_TIMEOUT` seconds (a looping animation never goes idle: raise it, or use a screenshot), or the device is gone |
+| `mobile-sensor.sh: … is not an emulator` | only an emulator's sensors can be set: a phone's are its own. Name an emulator with `-s <serial>` |
+| `mobile-sensor.sh: the console of … refused …` | its answer follows: `unknown sensor name` or `sensor is disabled` (`mobile-sensor.sh status` lists the ones there are), or adb's own error, e.g. a device that's gone |
+| `mobile-sensor.sh: … takes 3 values, not …` | `set` gives a sensor all its values: as many as `mobile-sensor.sh get <sensor>` shows |
+| An app doesn't follow `mobile-sensor.sh tilt`, or follows it in jumps | it may read a sensor Android works out itself, such as gravity or a rotation vector, which lags behind, or one the image doesn't have; on API 21 and 30 new values reach apps every 0.8 s only ([what apps get](DRIVING.md#sensors)) |
 | `mobile-ui.sh: no element matches …` | `mobile-ui.sh list` shows what's there; the app's view may be invisible to uiautomator ([`DRIVING.md`](DRIVING.md#seeing-the-screen)) |
 
 ## The window under WSLg

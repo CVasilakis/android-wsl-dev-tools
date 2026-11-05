@@ -96,7 +96,8 @@ anything.
 | `GPU_MODE=swangle_indirect` rather than the emulator's usual `swiftshader_indirect` | `lib/sdk.sh` | With `swiftshader_indirect`, every cold boot on API 36 and 37 ended with "System UI isn't responding" over the home screen, which takes every touch until tapped ([`docs/EMULATORS.md`](docs/EMULATORS.md#the-renderer)). |
 | Playing gestures with our own program rather than `adb shell input`; touches sent with the device's touchscreen as their device | `bin/mobile-touch.sh`, `lib/Gesture.java` | [`docs/DRIVING.md`](docs/DRIVING.md#touch). |
 | The dex's name holding its checksum | `bin/mobile-touch.sh` | A changed program must reach a device that holds the old one. |
-| Success read from the output, not `adb shell`'s exit status | `bin/mobile-touch.sh`, `bin/mobile-ui.sh` | Before API 24 `adb shell` always exits 0. |
+| Success read from the output, not `adb shell`'s or `adb emu`'s exit status | `bin/mobile-touch.sh`, `bin/mobile-ui.sh`, `bin/mobile-sensor.sh` | Before API 24 `adb shell` always exits 0; `adb emu` exits 0 when the console answers KO. |
+| Every sensor's command in one `adb emu` call, one per line; values checked before they're sent | `bin/mobile-sensor.sh` | Its header: one call per step keeps a smooth tilt smooth, and the console takes too few or malformed values without a word. |
 | `read_screen` asking `ui_tree.py` whether a dump parses, not only whether one came | `bin/mobile-ui.sh` | A dump cut short made `wait-gone` report that the element was gone. |
 | `grep … > /dev/null`, not `grep -q`, after a pipe from adb | `bin/mobile-ui.sh`, `bin/mobile-start-emulator.sh` | `grep -q` stops reading, and under `pipefail` that can fail a good look. |
 | `readlink -f` when sourcing `lib/` and in `TOOLS_DIR` | `bin/*.sh`, `lib/sdk.sh` | Scripts called through a symlink on `PATH` must still find the repository. |

@@ -1,8 +1,8 @@
 # Driving an emulator
 
 Using a running emulator from the window, a terminal, a script or a coding agent: touching it,
-typing into it, seeing what it shows. Getting one running: [`EMULATORS.md`](EMULATORS.md). The
-commands' options are in their `--help`.
+typing into it, seeing what it shows, tilting it. Getting one running:
+[`EMULATORS.md`](EMULATORS.md). The commands' options are in their `--help`.
 
 Everything here works the same on every [tested image](EMULATORS.md#tested-images). With several
 devices connected, name one with `-s <serial>`, or set `ANDROID_SERIAL` to the serial
@@ -102,6 +102,77 @@ aren't text go through adb: `adb shell input keyevent ENTER`.
 
 Esc and F1 don't reach Android: the emulator's window consumes them. With a text field focused,
 Ctrl+= can also type a character into it.
+
+## Sensors
+
+`mobile-sensor.sh` sets an emulator's sensors, as if the device were held or moved:
+
+```bash
+mobile-sensor.sh tilt 30 0           # lying face up, its top edge raised by 30°
+mobile-sensor.sh tilt 60 0 1000      # from there to 60°, turning smoothly for a second
+mobile-sensor.sh tilt 0 -20          # lying flat, its left edge lowered by 20°
+mobile-sensor.sh flat                # lying face up: tilt 0 0
+mobile-sensor.sh status              # the sensors the emulator has, with their values
+mobile-sensor.sh get acceleration    # 0 9.77631 0.812349
+mobile-sensor.sh set light 300       # any sensor, values of your own
+```
+
+**The attitude.** `tilt <pitch> <roll>` starts from lying face up, screen to the sky. Pitch raises
+the top edge: 90 holds the device upright, facing you, and past 90 it leans away. Roll then lowers
+the right edge, or the left one for a negative roll. The emulator boots upright and leaning back a
+little, at about `tilt 85 0`. Values are in Android's axes: x to the right of the screen, y up it, z
+out of it. The accelerometer reads 9.81 m/s² along the axis that points up, so lying flat it reads
+`0 0 9.81`, upright `0 9.81 0`, and at any attitude 9.81 × (−sin roll × cos pitch, sin pitch,
+cos pitch × cos roll).
+
+**The motion sensors agree.** The console sets one sensor at a time and leaves the others as they
+were, so `tilt` sets all of them from the one attitude:
+
+- the accelerometer;
+- the magnetic field: the emulator's own, 48.4 µT north and 5.9 µT up, with the device's top edge
+  towards magnetic north;
+- the gyroscope: the rate of turn while it moves, 0 at the end;
+- the deprecated orientation sensor;
+- and the uncalibrated ones, with no bias.
+
+`set` changes only the sensor named.
+
+**Smooth moves.** With a time in ms, `tilt` and `flat` start from the attitude the accelerometer
+shows now, and turn at an even rate, each angle the short way round. They set the sensors every
+20 ms, or every `AWDT_SENSOR_STEP_MS`. The steps follow the clock: on a busy host there are fewer
+of them, and the move still takes the time asked. Without a time, the sensors jump to the new
+attitude at once. An app gets a new value with its next sensor event on API 36; on API 21 and 30
+the emulator passes new values on only every 0.8 s, and the events in between repeat the last one,
+so there a smooth move reaches apps in steps of 0.8 s.
+
+| Sensor | Values | Unit |
+|---|---|---|
+| `acceleration` (and `-uncalibrated`) | x y z | m/s² |
+| `gyroscope` (and `-uncalibrated`) | x y z | rad/s |
+| `magnetic-field` (and `-uncalibrated`) | x y z | µT |
+| `orientation` | azimuth pitch roll | degrees |
+
+The others take Android's unit for their kind: °C, cm, lux, hPa, %. `set` takes as many values as
+`get` shows.
+
+**What apps get.** On the plain images of API 21, 30 and 36, the console has the same sensors, the
+ones above plus temperature, proximity, light, pressure and humidity; the rest, such as the hinge
+angles and heart rate, are disabled. What reaches an app differs:
+
+| An app's sensor | API 21 | API 30 | API 36 |
+|---|---|---|---|
+| Accelerometer, magnetic field, orientation (`TYPE_ORIENTATION`) | as set | as set | as set |
+| Gyroscope | none: the image has no gyroscope | as set | as set |
+| Gravity, linear acceleration, rotation vectors | none | Android's own | Android's own |
+| New values reach it | every 0.8 s | every 0.8 s | with each event |
+
+Android works its own sensors out from the others. On API 30 and 36 they follow a change of the
+accelerometer with a lag, and ignore the gyroscope the console sets, so check a tilt through the
+accelerometer.
+
+**How it works.** Each step is one `adb emu` call that carries every sensor's command on a line of
+its own, which costs about as much as one command. A phone's sensors are its own, with no console
+to set them through, so `mobile-sensor.sh` only acts on an emulator.
 
 ## Changing the device
 
