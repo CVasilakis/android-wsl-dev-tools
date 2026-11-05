@@ -107,6 +107,9 @@ Why the steps look like this:
 - **`sdkmanager --licenses` first.** The runner image has accepted only the licenses of the
   packages it installed itself, and sdkmanager refuses to install a package under another one.
   `yes` complains when sdkmanager stops reading, hence its `2> /dev/null`.
+- **`apt-get` can wait for good** when the runner's Ubuntu mirror stops answering, which happens
+  now and then; the job then waits for `timeout-minutes`. The emulator-tier workflow runs it under
+  `timeout` and tries up to three times.
 - **sdkmanager's output in a file.** It's mostly progress bars, so the job log shows it only
   when the install fails, where it says why.
 - **`-no-snapshot-save`**: the emulator saves a Quick Boot snapshot when it's stopped, which is
@@ -123,6 +126,15 @@ Why the steps look like this:
   before booting the next one in the same job: `mobile-stop-emulator.sh "$ANDROID_SERIAL"`, which
   returns once it has exited.
 
+## Images that fail on the runners
+
+**API 36.1 and 37** (plain and Google APIs), with emulator 37.2.13: soon after a boot, SurfaceFlinger
+aborts with `Assertion failed: !rcEnc->featureInfo()->hasReadColorBufferDma` (in `adb logcat -b
+crash`), Android's system services restart, and what runs then fails, e.g. an install with `Failure
+calling service package: Broken pipe`. The same images and emulator pass on a WSL host, and on the
+runners neither `-gpu swiftshader_indirect` nor `-feature -GLDMA2` avoids it. Test those levels on
+a workstation for now.
+
 ## Caching
 
 The system image is the big download. To skip it on later runs, cache
@@ -135,5 +147,6 @@ you cache it anyway, `mobile-create-avd.sh --if-missing` keeps the cached AVD
 ([`EMULATORS.md`](EMULATORS.md#creating-one)), and `mobile-start-emulator.sh … -wipe-data` starts it
 from a clean data partition.
 
-This guide hasn't been run on GitHub yet: it's what works for the sibling Android TV tools, with
-this repository's names. The first run that proves it, or doesn't, should update this line.
+Its setup steps, up to the boot, run on GitHub's runners in this repository's own
+[emulator-tier workflow](../.github/workflows/emulator-tier.yml), on every tested image but those
+[above](#images-that-fail-on-the-runners); its Gradle step hasn't been run here.

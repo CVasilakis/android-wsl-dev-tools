@@ -22,8 +22,15 @@ too. The emulator tier runs on GitHub only by hand, in
 [`emulator-tier.yml`](../.github/workflows/emulator-tier.yml) (Actions → Emulator tier → Run
 workflow): one runner per image, set up as [`docs/CI.md`](../docs/CI.md) describes, with
 `--strict`. Pick all the tested images, one kind of them, or only some API levels, and
-emulator flags for its boots (`AWDT_TEST_EMULATOR_FLAGS`, below) if need be. Before a
-release, run it on all of them, or run the tier locally ([below](#the-emulator-tier)).
+emulator flags for its boots (`AWDT_TEST_EMULATOR_FLAGS`, below) if need be. Four tested images
+run only locally, and each run names them: API 37, and the Google APIs images of API 36.1, 37 and
+23, which fail on the runners and pass on a WSL host
+([`docs/CI.md`](../docs/CI.md#images-that-fail-on-the-runners) says why for the first three; on
+API 23, `uiautomator` crashes Android's system process in the window test's boot). On a busy
+runner the window test can lose a pointer event, and the quick swipe can arrive with too few moves
+to be a fling: re-run the failed jobs once ("Re-run failed jobs"), and a second failure is real.
+Before a release, run the workflow on all images and the four locally, or every image locally
+([below](#the-emulator-tier)).
 
 ## Tiers
 

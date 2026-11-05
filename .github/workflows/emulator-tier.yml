@@ -40,9 +40,11 @@ jobs:
         shell: python
         # The images docs/EMULATORS.md lists as tested, each with its AVD's name, the arguments
         # mobile-create-avd.sh makes it with, and its SDK package. From API 37 on a level's package
-        # has a minor version, and API 27's Google APIs image is x86 only.
+        # has a minor version, and API 27's Google APIs image is x86 only. LOCAL_ONLY can't pass
+        # here and is run locally instead (tests/README.md).
         run: |
           import json, os
+          LOCAL_ONLY = ["phone_api37", "phone_gapi37", "phone_gapi36.1", "phone_gapi23"]
           kind, wanted = os.environ["IMAGES"], os.environ["LEVELS"].split()
           def package(level, tag):
               folder = "37.0" if level == "37" else level
@@ -63,6 +65,12 @@ jobs:
               images = [image for image in images if image["level"] in wanted]
           if not images:
               raise SystemExit(f"No tested image of '{kind}' has the levels '{' '.join(wanted)}'.")
+          left_out = [image["avd"] for image in images if image["avd"] in LOCAL_ONLY]
+          images = [image for image in images if image["avd"] not in LOCAL_ONLY]
+          if left_out:
+              print(f"::notice::Run locally, not here: {' '.join(left_out)} (tests/README.md)")
+          if not images:
+              raise SystemExit("Every image picked runs only locally (tests/README.md).")
           with open(os.environ["GITHUB_OUTPUT"], "a") as output:
               output.write(f"matrix={json.dumps({'include': images})}\n")
 
