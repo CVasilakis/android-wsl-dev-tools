@@ -86,6 +86,13 @@ takes every touch until `mobile-ui.sh tap Wait`. With `swangle_indirect` that do
 boot is faster, and the emulator takes less memory. A `-gpu` flag of your own replaces it for one
 boot, and AWDT_TEST_EMULATOR_FLAGS for the tests.
 
+The trade-off: `swangle_indirect` offers apps fewer EGL configurations. On API 30 it has RGBA 8888
+and RGB 888, each with a 24-bit depth buffer, and nothing with fewer bits per colour. An app whose
+config chooser insists on one it doesn't offer, as older game engines insist on exactly RGB 565,
+gets none, and its `GLSurfaceView` throws `IllegalArgumentException` in `eglCreateContext` as it
+starts. `swiftshader_indirect` has RGB 565 there, so boot such an app's AVD with `-gpu
+swiftshader_indirect`; on API 36 and 37, then tap System UI's dialog away once.
+
 ### Other screens
 
 On a running emulator, no new AVD and no reboot; the change stays until it's reset:

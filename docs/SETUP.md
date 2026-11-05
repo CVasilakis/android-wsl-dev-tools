@@ -262,6 +262,8 @@ Notes before you use it:
 - **Package ids take `/` or `;`**: `android sdk list` prints `platforms/android-36`, and both
   `android sdk install "platforms;android-36"` and `.../android-36` work. This document keeps the
   `;` form, which is also what Gradle error messages and `package.xml` use.
+- **It doesn't fall back to IPv4.** On a host whose IPv6 doesn't reach Google, it waits without a
+  word ([what to do](TROUBLESHOOTING.md#setup)).
 - **It exits 0 when a package doesn't exist**, printing only `Package … not found.` on stdout, so
   `android sdk install <typo> && …` carries on as if it had worked. Check with
   `android sdk list --no-metrics` rather than trusting the exit status.

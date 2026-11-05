@@ -20,6 +20,14 @@ the guides they link to explain the background.
 - **`Package … not found.`** from `android sdk install`, and the setup carries on regardless: a
   typo in a package id. The command exits 0 anyway, so check with `android sdk list --no-metrics`
   ([The `android` CLI](SETUP.md#the-android-cli)).
+- **`android sdk install` or `android sdk list` sits there without a word**, while a
+  `repo-index…tmp.part` in `/tmp` stays at 0 bytes: the host has an IPv6 address, but IPv6 doesn't
+  reach Google (seen under WSL's mirrored networking), and the `android` CLI waits on it without
+  falling back to IPv4 as `curl` does. `curl -6 -sI -m 10 https://dl.google.com/` timing out while
+  `curl -4 …` answers confirms it. Install with `sdkmanager --install "<package>"…` (in
+  `cmdline-tools/latest/bin`) instead: up to cmdline-tools 22.0 it's a Java program of its own,
+  which uses IPv4. From 23.0 on it runs the `android` CLI ([The `android`
+  CLI](SETUP.md#the-android-cli)), so there the fix is the host's network.
 - **`WARNING: The SDK Manager CLI tool (sdkmanager) is deprecated`**: use `android sdk` instead;
   the table in [The `android` CLI](SETUP.md#the-android-cli) maps the old commands to the new ones.
 - **`SDK location not found`** during a build, although `echo $ANDROID_HOME` works in your terminal:
@@ -55,6 +63,12 @@ the guides they link to explain the background.
 | `can't tell which AVD to use` / `there's no AVD named …` | pass the AVD name or set `AWDT_AVD`; the message lists the AVDs found |
 | Black emulator window | if started with `--quick`, start it without |
 | The emulator dies in a long series of app starts, the host out of memory (`page allocation failure` in `dmesg`, swap full) | its `qemu-system-…` process grows with every cold start of an app, and gives nothing back while it runs: stop it and start it again between batches of starts |
+
+## Apps
+
+| Symptom | Cause / fix |
+|---|---|
+| An app with an OpenGL ES view crashes as it starts: `FATAL EXCEPTION: GLThread` and `IllegalArgumentException` in `eglCreateContext` (`adb logcat -b crash`) | its EGL config chooser accepts none of the default renderer's configurations, e.g. it insists on RGB 565: boot with `-gpu swiftshader_indirect` ([the renderer](EMULATORS.md#the-renderer)) |
 
 ## Stopping
 

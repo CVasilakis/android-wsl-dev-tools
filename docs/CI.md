@@ -95,10 +95,10 @@ Why the steps look like this:
   step; inside `echo "…$(mobile-start-emulator.sh)" >> …` the step would carry on with an empty
   serial.
 - **`ANDROID_SERIAL`** makes adb and Gradle use that emulator in every later step.
-- **`--wait-for-home`** (from v1.5.0 on): `mobile-start-emulator.sh` returns once Android has booted
+- **`--wait-for-home`**: `mobile-start-emulator.sh` returns once Android has booted
   (`sys.boot_completed`), which on a runner comes before the device has settled, so the tests' first
-  touches could reach no app. With `--wait-for-home` it also waits until the home screen is in
-  front with the focus ([`EMULATORS.md`](EMULATORS.md#booting-one)).
+  touches could reach no app. With `--wait-for-home` it also waits until the home screen is in front
+  with the focus ([`EMULATORS.md`](EMULATORS.md#booting-one)).
 - **Freeing disk space.** On its first boot the emulator creates the AVD's data partition, and
   needs that much free, on top of the system image ([sizes](SETUP.md#sizes)), which the runner's
   disk may not have. It deletes toolchains the runner image preinstalls and most
