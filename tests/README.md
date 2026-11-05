@@ -64,6 +64,7 @@ removes it afterwards.
 - **The mouse:** the real emulator window on a private X server, with real pointer events (XTest,
   which WSLg's own display ignores), so a click, a held button and a drag are checked as touches.
   That covers everything from the X server on, not WSLg's own way to it, which needs a real mouse.
+  It needs Xvfb and `xwininfo` (`sudo apt-get install -y xvfb x11-utils`), and skips without them.
 - **Stopping:** `mobile-stop-emulator.sh` returns only once the AVD can start again, also for a
   `-read-only` emulator, which writes no lock file, a frozen one, and one that's exiting already.
 

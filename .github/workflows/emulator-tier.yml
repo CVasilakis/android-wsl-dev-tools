@@ -66,8 +66,8 @@ jobs:
     needs: images
     name: ${{ matrix.avd }}
     runs-on: ubuntu-24.04
-    # Only for a hang: the tier's own limits end a stuck boot or test well before this.
-    timeout-minutes: 120
+    # Only for a hang, as in docs/CI.md: the tier's own limits end a stuck boot or test before this.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.images.outputs.matrix) }}
@@ -88,13 +88,13 @@ jobs:
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      # The emulator's system libraries (docs/SETUP.md, step 1), and Xvfb for the test of the
-      # emulator's window, which --strict won't let skip.
-      - name: Install the emulator's system libraries and Xvfb
+      # The emulator's system libraries (docs/SETUP.md, step 1), and Xvfb and xwininfo for the
+      # test of the emulator's window, which --strict won't let skip.
+      - name: Install the emulator's system libraries, Xvfb and xwininfo
         run: |
           sudo apt-get update
           sudo apt-get install -y libpulse0 libnss3 libxkbfile1 libsm6 libxext6 libxi6 libdrm2 \
-            libpng16-16t64 xvfb
+            libpng16-16t64 xvfb x11-utils
       - name: Install the emulator and the system image
         env:
           PACKAGE: ${{ matrix.package }}

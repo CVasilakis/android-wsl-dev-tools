@@ -15,6 +15,7 @@ import math
 import os
 import re
 import shlex
+import shutil
 import signal
 import struct
 import subprocess
@@ -183,7 +184,8 @@ class Device:
         self.adb("uninstall", "awdt.probe")
         installed = self.adb("install", str(PROBE))
         if "Success" not in installed.stdout:
-            raise AssertionError(f"couldn't install the probe:\n{installed.stdout}{installed.stderr}")
+            raise AssertionError(f"couldn't install the probe:\n{installed.stdout}{installed.stderr}"
+                                 + self.state())
 
     def remove_probe(self):
         self.adb("uninstall", "awdt.probe")
@@ -201,13 +203,22 @@ class Device:
             if re.search(r"mCurrentFocus=.*awdt\.probe/", focused):
                 break
         else:
-            raise AssertionError(f"the probe didn't come to the front:\n{focused}")
+            raise AssertionError(f"the probe didn't come to the front:\n{focused}" + self.state())
         # A window with the focus can still be coming: a touch then finds no window to go to, as on
         # a phone (seen on Google APIs of API 36.1). uiautomator answers once the screen is idle.
         shown = self.ui("wait", "id:probe_button", FOCUS_TIMEOUT)
         if shown.returncode != 0:
-            raise AssertionError(f"the probe's screen didn't settle:\n{shown.stderr}")
+            raise AssertionError(f"the probe's screen didn't settle:\n{shown.stderr}" + self.state())
         self.forget_log()
+
+    def state(self):
+        """What the device shows and logged lately, for a failure where it was in a state no test
+        expects (seen on runners, where it can't be looked at afterwards): what's in front, and
+        the last crashes and errors Android logged."""
+        sections = [("in front", self.ui("front").stdout),
+                    ("crashes", self.adb("logcat", "-d", "-b", "crash", "-t", "40").stdout),
+                    ("errors", self.adb("logcat", "-d", "-t", "60", "*:E").stdout)]
+        return "".join(f"\n--- {title}:\n{text.strip() or '(nothing)'}" for title, text in sections)
 
     def forget_log(self):
         """From now on log() starts here. By a line of our own in the log, as `logcat -c` leaves
@@ -539,6 +550,8 @@ class MouseOnTheEmulatorsWindow(unittest.TestCase):
     def setUpClass(cls):
         cls.avd = default_avd()
         reason = x11.unavailable_reason()
+        if not reason and not shutil.which("xwininfo"):
+            reason = "xwininfo isn't installed (apt install x11-utils / dnf install xorg-x11-utils)"
         if reason or os.environ.get("SCRIPT_TESTS_DISPLAY"):
             raise unittest.SkipTest(reason or "never on a real display")
         if not cls.avd or serial_of(cls.avd):
