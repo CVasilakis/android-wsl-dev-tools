@@ -1,0 +1,116 @@
+# The emulator tier (tests/README.md) on GitHub's runners, started by hand (Actions -> Emulator
+# tier -> Run workflow): one job per image, each on a runner of its own, set up as docs/CI.md
+# describes. Before a release, run it on "all": every tested image (docs/EMULATORS.md).
+name: Emulator tier
+
+on:
+  workflow_dispatch:
+    inputs:
+      images:
+        description: The tested images to run on
+        type: choice
+        default: all
+        options: [all, plain, google-apis, tablets]
+      levels:
+        description: Only these API levels, e.g. "21 30 36" (empty for every level of the set)
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  images:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+      - name: List the images
+        id: list
+        env:
+          IMAGES: ${{ inputs.images }}
+          LEVELS: ${{ inputs.levels }}
+        shell: python
+        # The images docs/EMULATORS.md lists as tested, each with its AVD's name, the arguments
+        # mobile-create-avd.sh makes it with, and its SDK package. From API 37 on a level's package
+        # has a minor version, and API 27's Google APIs image is x86 only.
+        run: |
+          import json, os
+          kind, wanted = os.environ["IMAGES"], os.environ["LEVELS"].split()
+          def package(level, tag):
+              folder = "37.0" if level == "37" else level
+              abi = "x86" if (level, tag) == ("27", "google_apis") else "x86_64"
+              return f"system-images;android-{folder};{tag};{abi}"
+          plain = [str(level) for level in range(21, 38)]
+          images = []
+          if kind in ("all", "plain"):
+              images += [{"avd": f"phone_api{l}", "level": l, "create": f"--api {l}",
+                          "package": package(l, "default")} for l in plain]
+          if kind in ("all", "google-apis"):
+              images += [{"avd": f"phone_gapi{l}", "level": l, "create": f"--google-apis --api {l}",
+                          "package": package(l, "google_apis")} for l in plain + ["36.1"]]
+          if kind in ("all", "tablets"):
+              images += [{"avd": f"tablet_api{l}", "level": l, "create": f"--tablet --api {l}",
+                          "package": package(l, "default")} for l in ("30", "36")]
+          if wanted:
+              images = [image for image in images if image["level"] in wanted]
+          if not images:
+              raise SystemExit(f"No tested image of '{kind}' has the levels '{' '.join(wanted)}'.")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"matrix={json.dumps({'include': images})}\n")
+
+  tier:
+    needs: images
+    name: ${{ matrix.avd }}
+    runs-on: ubuntu-24.04
+    # Only for a hang: the tier's own limits end a stuck boot or test well before this.
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.images.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Free disk space for the system image and the AVD
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
+            /opt/hostedtoolcache/CodeQL "$ANDROID_HOME/ndk"
+          df -h /
+      - name: Let the runner user open /dev/kvm
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      # The emulator's system libraries (docs/SETUP.md, step 1), and Xvfb for the test of the
+      # emulator's window, which --strict won't let skip.
+      - name: Install the emulator's system libraries and Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpulse0 libnss3 libxkbfile1 libsm6 libxext6 libxi6 libdrm2 \
+            libpng16-16t64 xvfb
+      - name: Install the emulator and the system image
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes 2> /dev/null | "$sdkmanager" --licenses > /dev/null
+          "$sdkmanager" "emulator" "platform-tools" "$PACKAGE" \
+            > "$RUNNER_TEMP/sdkmanager.log" || { cat "$RUNNER_TEMP/sdkmanager.log"; exit 1; }
+
+      - name: Create the AVD
+        run: bin/mobile-create-avd.sh ${{ matrix.create }}
+      - name: Run the emulator tier
+        env:
+          AWDT_AVD: ${{ matrix.avd }}
+        run: python tests/run.py --emulator --strict          # a skipped test fails the run
+
+      - name: Show the end of the emulator's log
+        if: failure()
+        run: tail -n 300 "${TMPDIR:-/tmp}"/emulator-*.log || true

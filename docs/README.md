@@ -35,7 +35,7 @@ How the docs are written and kept up to date: [below](#writing-the-docs). Coding
 | [`tests/`](../tests/README.md) | The tests of the commands. |
 | [`docs/`](README.md) | These guides. |
 | [`AGENTS.md`](../AGENTS.md) | Rules for changing this repository. |
-| `.github/workflows/` | The workflow that runs the tests ([`tests/README.md`](../tests/README.md)). |
+| `.github/workflows/` | The workflows that run the tests: the hermetic tier on every push, the emulator tier by hand ([`tests/README.md`](../tests/README.md)). |
 
 ## Writing the docs
 

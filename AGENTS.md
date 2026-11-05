@@ -45,8 +45,8 @@ The commands themselves are in [`bin/README.md`](bin/README.md).
   write them: [`tests/README.md`](tests/README.md#writing-tests).
 - **No dependencies**: bash, coreutils and the Python standard library (3.10+) only. New tools
   (even test-only) need the user's agreement.
-- **Before a release, run the emulator tier locally** on every tested image
-  ([`tests/README.md`](tests/README.md)): CI runs only the hermetic tier.
+- **Before a release, run the emulator tier** on every tested image, locally or with the Emulator
+  tier workflow ([`tests/README.md`](tests/README.md)): on a push, CI runs only the hermetic tier.
 - **The docs follow [their own rules](docs/README.md#writing-the-docs)**: each fact in one document,
   a parent names its children and doesn't repeat them, the current state and not history, no
   machine-specific measurements, paths with `~`. This file: rules for changes, and pointers.

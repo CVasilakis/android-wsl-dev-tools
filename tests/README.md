@@ -18,7 +18,11 @@ CI ([`../.github/workflows/tests.yml`](../.github/workflows/tests.yml)) runs the
 `--strict` on every push to `main` and every pull request, on Python 3.10 and the newest Python.
 It installs the optional tools below, so there a skip fails the run instead of hiding a test that
 no longer runs; a test that needs another optional tool must have it installed in the workflow
-too. The emulator tier isn't run there; run it locally before a release.
+too. The emulator tier runs on GitHub only by hand, in
+[`emulator-tier.yml`](../.github/workflows/emulator-tier.yml) (Actions → Emulator tier → Run
+workflow): one runner per image, set up as [`docs/CI.md`](../docs/CI.md) describes, with
+`--strict`. Pick all the tested images, one kind of them, or only some API levels. Before a
+release, run it on all of them, or run the tier locally ([below](#the-emulator-tier)).
 
 ## Tiers
 

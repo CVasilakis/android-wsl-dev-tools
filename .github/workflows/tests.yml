@@ -1,5 +1,5 @@
 # The hermetic tier (tests/README.md) on every push to main and every pull request. The
-# real-emulator tier isn't run here: run `tests/run.py --emulator` locally before a release.
+# real-emulator tier isn't run here: emulator-tier.yml runs it by hand, or run it locally.
 name: Tests
 
 on:
