@@ -21,7 +21,8 @@ no longer runs; a test that needs another optional tool must have it installed i
 too. The emulator tier runs on GitHub only by hand, in
 [`emulator-tier.yml`](../.github/workflows/emulator-tier.yml) (Actions → Emulator tier → Run
 workflow): one runner per image, set up as [`docs/CI.md`](../docs/CI.md) describes, with
-`--strict`. Pick all the tested images, one kind of them, or only some API levels. Before a
+`--strict`. Pick all the tested images, one kind of them, or only some API levels, and
+emulator flags for its boots (`AWDT_TEST_EMULATOR_FLAGS`, below) if need be. Before a
 release, run it on all of them, or run the tier locally ([below](#the-emulator-tier)).
 
 ## Tiers

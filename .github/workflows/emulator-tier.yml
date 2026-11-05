@@ -15,6 +15,10 @@ on:
         description: Only these API levels, e.g. "21 30 36" (empty for every level of the set)
         type: string
         default: ""
+      emulator_flags:
+        description: Extra emulator flags for the tier's boots, e.g. "-gpu swiftshader_indirect"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -115,6 +119,7 @@ jobs:
       - name: Run the emulator tier
         env:
           AWDT_AVD: ${{ matrix.avd }}
+          AWDT_TEST_EMULATOR_FLAGS: ${{ inputs.emulator_flags }}
         run: python tests/run.py --emulator --strict          # a skipped test fails the run
 
       - name: Show the end of the emulator's log
