@@ -12,9 +12,6 @@ The [emulator tier](../tests/README.md#the-emulator-tier) passes on each of thes
   as `phone_gapi<level>`.
 - **Tablets:** `tablet_api30` and `tablet_api36`, from the plain images.
 
-`mobile-sensor.sh`, and the tier's tests of it, so far only on the plain images of API 21, 30 and
-36 ([what each one's apps get](DRIVING.md#sensors)).
-
 A foldable (`pixel_9_pro_fold`, API 36) boots and lists its folded states, but the tier hasn't run
 on one. Untested: the Google Play images (`google_apis_playstore`), which have no root; the 16 KB
 page size images; and any level below 21.
