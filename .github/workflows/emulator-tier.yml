@@ -89,12 +89,18 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       # The emulator's system libraries (docs/SETUP.md, step 1), and Xvfb and xwininfo for the
-      # test of the emulator's window, which --strict won't let skip.
+      # test of the emulator's window, which --strict won't let skip. When the runner's Ubuntu
+      # mirror stops answering, apt-get can wait for good, so each try has a limit.
       - name: Install the emulator's system libraries, Xvfb and xwininfo
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libpulse0 libnss3 libxkbfile1 libsm6 libxext6 libxi6 libdrm2 \
-            libpng16-16t64 xvfb x11-utils
+          for try in 1 2 3; do
+            timeout 300 sudo apt-get update \
+              && timeout 300 sudo apt-get install -y libpulse0 libnss3 libxkbfile1 libsm6 libxext6 \
+                libxi6 libdrm2 libpng16-16t64 xvfb x11-utils \
+              && exit 0
+            echo "apt-get failed or got stuck (try $try of 3)"
+          done
+          exit 1
       - name: Install the emulator and the system image
         env:
           PACKAGE: ${{ matrix.package }}
